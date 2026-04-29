@@ -772,7 +772,7 @@
         </button>
       </div>
 
-      <!-- Grow Lattice (disabled - not yet implemented) -->
+      <!-- Grow Lattice: controls supercell_size for generate_bonds -->
       <div class="panel-label">Grow lattice</div>
       <div class="section-block">
         <div class="field-row">
@@ -787,8 +787,8 @@
           <span class="field-label">Lz:</span>
           <input type="number" id="p1-lz" value="1" min="1" step="1">
         </div>
-        <button class="btn btn-full disabled" data-tip="Not yet implemented">
-          ↗ Grow unit cell
+        <button class="btn btn-full" onclick="addBonds()">
+          ↗ Apply &amp; grow
         </button>
       </div>
 
@@ -1228,10 +1228,14 @@ async function addBonds() {
   const rmin  = parseFloat(document.getElementById('p1-rmin').value);
   const rmax  = parseFloat(document.getElementById('p1-rmax').value);
   const discr = parseFloat(document.getElementById('p1-discr').value);
-  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr);
+  const lx    = parseInt(document.getElementById('p1-lx').value) || 1;
+  const ly    = parseInt(document.getElementById('p1-ly').value) || 1;
+  const lz    = parseInt(document.getElementById('p1-lz').value) || 1;
+  const sc    = Math.max(lx, ly, lz);   // library uses a single scalar
+  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr + ' supercell_size=' + sc);
   try {
     const data = await api('POST', '/model/add_bonds', {
-      session_id: sessionId, rmin, rmax, discretization: discr
+      session_id: sessionId, rmin, rmax, discretization: discr, supercell_size: sc
     });
     document.getElementById('modelEditor').value = data.cif_text;
     document.getElementById('modelStat').textContent = data.cif_text.split('\n').length + ' lines';
