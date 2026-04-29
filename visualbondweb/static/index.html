@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualbond — Spectrojotometer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg:        #0f1117;
+    --bg2:       #161b27;
+    --bg3:       #1d2436;
+    --border:    #2a3350;
+    --border2:   #3a4a6a;
+    --accent:    #4a9eff;
+    --accent2:   #7ec8e3;
+    --green:     #3ecf8e;
+    --amber:     #f6a623;
+    --red:       #ff5a5a;
+    --text:      #e2e8f0;
+    --text2:     #8a9bb5;
+    --text3:     #556070;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+    --radius:    6px;
+    --tab-h:     40px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    height: 44px;
+    padding: 0 12px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-right: 20px;
+    border-right: 1px solid var(--border);
+    margin-right: 8px;
+  }
+  .logo-hex {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-hex svg { width: 28px; height: 28px; }
+  .app-title { font-size: 14px; font-weight: 600; letter-spacing: 0.02em; color: var(--text); }
+  .app-sub   { font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; }
+
+  /* menu bar */
+  .menubar { display: flex; gap: 2px; }
+  .menu-item {
+    position: relative;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text2);
+    transition: background .12s, color .12s;
+  }
+  .menu-item:hover { background: var(--bg3); color: var(--text); }
+  .menu-item.open  { background: var(--bg3); color: var(--text); }
+  .dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    min-width: 210px;
+    z-index: 999;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    padding: 4px 0;
+  }
+  .menu-item.open .dropdown { display: block; }
+  .dd-item {
+    padding: 7px 16px;
+    cursor: pointer;
+    color: var(--text2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background .1s, color .1s;
+  }
+  .dd-item:hover { background: var(--bg3); color: var(--text); }
+  .dd-item .kbd  { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+  .dd-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+  /* file info pill */
+  .file-pill {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .file-pill .fname {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    color: var(--accent2);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--text3);
+  }
+  .status-dot.loaded { background: var(--green); }
+
+  /* ── Tab bar ── */
+  .tabbar {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    height: var(--tab-h);
+    flex-shrink: 0;
+    padding: 0 8px;
+    gap: 2px;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 18px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab.disabled {
+    opacity: .35;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .tab-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--text3);
+  }
+  .tab.active .tab-num {
+    background: rgba(74,158,255,.15);
+    border-color: rgba(74,158,255,.3);
+    color: var(--accent);
+  }
+
+  /* ── Main layout ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .page { display: none; flex: 1; overflow: hidden; }
+  .page.active { display: flex; }
+
+  /* shared panel chrome */
+  .panel-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 8px 12px 6px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+
+  /* ─────────────────────────────────────
+     PAGE 1 — Define Model
+  ───────────────────────────────────── */
+  #page1 {
+    flex-direction: row;
+  }
+  .p1-sidebar {
+    width: 210px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg2);
+    overflow-y: auto;
+  }
+  .p1-editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .section-block {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+  .field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 7px;
+    gap: 8px;
+  }
+  .field-label {
+    font-size: 12px;
+    color: var(--text2);
+    min-width: 90px;
+    flex-shrink: 0;
+  }
+  input[type="text"], input[type="number"] {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 8px;
+    width: 80px;
+    transition: border-color .15s;
+    outline: none;
+  }
+  input[type="text"]:focus, input[type="number"]:focus {
+    border-color: var(--accent);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--bg3);
+    color: var(--text2);
+    transition: background .12s, border-color .12s, color .12s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: #2a3450; border-color: var(--accent); color: var(--text); }
+  .btn.primary {
+    background: rgba(74,158,255,.15);
+    border-color: rgba(74,158,255,.5);
+    color: var(--accent);
+  }
+  .btn.primary:hover { background: rgba(74,158,255,.25); }
+  .btn.success {
+    background: rgba(62,207,142,.1);
+    border-color: rgba(62,207,142,.4);
+    color: var(--green);
+  }
+  .btn.success:hover { background: rgba(62,207,142,.2); }
+  .btn.disabled, .btn:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .btn-full { width: 100%; margin-top: 6px; }
+
+  .editor-area {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    background: var(--bg);
+    color: var(--text);
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 16px 20px;
+    overflow-y: auto;
+  }
+  .editor-area::placeholder { color: var(--text3); }
+  .editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-top: 1px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+  }
+  .editor-stat {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  /* ─────────────────────────────────────
+     PAGE 2 — Spin Configurations
+  ───────────────────────────────────── */
+  #page2 { flex-direction: row; }
+  .p2-sidebar {
+    width: 210px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg2);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .p2-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+  }
+  .p2-results {
+    width: 340px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg2);
+  }
+  .result-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .result-panel:last-child { border-bottom: none; }
+
+  /* ─────────────────────────────────────
+     PAGE 3 — Evaluate
+  ───────────────────────────────────── */
+  #page3 { flex-direction: row; }
+  .p3-sidebar {
+    width: 210px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg2);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .p3-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    min-width: 0;
+  }
+  .p3-results {
+    width: 380px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg2);
+  }
+
+  /* radio group */
+  .radio-group { display: flex; flex-direction: column; gap: 6px; }
+  .radio-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+  }
+  .radio-row input[type="radio"] { accent-color: var(--accent); cursor: pointer; }
+  .radio-row.active { color: var(--text); }
+
+  /* select */
+  select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    font-family: var(--sans);
+    font-size: 12px;
+    padding: 4px 8px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* mc sub-params */
+  .mc-params {
+    padding: 8px 0 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .mc-params.hidden { display: none; }
+
+  /* ── Result text areas ── */
+  .result-text {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+    background: var(--bg);
+    color: var(--text2);
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 12px 14px;
+    overflow-y: auto;
+  }
+
+  /* ── Parameter results cards ── */
+  .param-cards {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+  }
+  .param-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .param-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .param-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+  }
+  .param-err {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .param-card.warn .param-name { color: var(--amber); }
+  .param-card.incompatible { border-color: rgba(255,90,90,.3); }
+  .param-card.incompatible .param-name { color: var(--red); }
+
+  /* chi error bars mini */
+  .chi-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+  }
+  .chi-label { font-family: var(--mono); font-size: 10px; color: var(--text3); min-width: 36px; }
+  .chi-bar-wrap { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .chi-bar { height: 100%; background: var(--green); border-radius: 3px; transition: width .3s; }
+  .chi-bar.warn { background: var(--amber); }
+  .chi-bar.bad  { background: var(--red); }
+  .chi-val { font-family: var(--mono); font-size: 10px; color: var(--text2); min-width: 40px; text-align: right; }
+
+  /* ── Status / log bar ── */
+  .statusbar {
+    height: 160px;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .log-logo {
+    width: 54px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg2);
+  }
+  .log-area {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    color: #4a7;
+    padding: 8px 14px;
+    overflow-y: auto;
+    background: #070c0f;
+  }
+  .log-area .log-err { color: var(--red); }
+  .log-area .log-warn { color: var(--amber); }
+  .log-area .log-info { color: var(--text3); }
+  .statusline {
+    height: 22px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 16px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+  .statusline .sl-item { display: flex; align-items: center; gap: 5px; }
+  .statusline .sl-item .dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--text3);
+  }
+  .statusline .sl-item.ok .dot  { background: var(--green); }
+  .statusline .sl-item.err .dot { background: var(--red); }
+
+  /* ── Import modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.65);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    width: 720px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  }
+  .modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .modal-close {
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    color: var(--text3);
+    font-size: 16px;
+    transition: background .1s, color .1s;
+  }
+  .modal-close:hover { background: var(--bg3); color: var(--text); }
+  .modal-body { flex: 1; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .modal-row { display: flex; gap: 12px; }
+  .modal-col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .modal-col-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 4px;
+  }
+  .modal-textarea {
+    flex: 1;
+    min-height: 200px;
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 10px 12px;
+    resize: none;
+    outline: none;
+  }
+  .modal-textarea:focus { border-color: var(--accent); }
+  .modal-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* upload zone */
+  .upload-zone {
+    border: 1px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    color: var(--text3);
+    font-size: 12px;
+  }
+  .upload-zone:hover {
+    border-color: var(--accent);
+    background: rgba(74,158,255,.05);
+    color: var(--text2);
+  }
+  .upload-icon { font-size: 22px; margin-bottom: 6px; }
+
+  /* tooltip */
+  [data-tip] { position: relative; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a2238;
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+    color: var(--text2);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border2); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ TOP BAR ═══════════════════ -->
+<div class="topbar">
+  <div class="logo-area">
+    <div class="logo-hex">
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="14,2 24,8 24,20 14,26 4,20 4,8" fill="none" stroke="#4a9eff" stroke-width="1.5"/>
+        <polygon points="14,7 20,10.5 20,17.5 14,21 8,17.5 8,10.5" fill="rgba(74,158,255,0.12)" stroke="#7ec8e3" stroke-width="1"/>
+        <circle cx="14" cy="14" r="2.5" fill="#4a9eff"/>
+      </svg>
+    </div>
+    <div>
+      <div class="app-title">Visualbond</div>
+      <div class="app-sub">spectrojotometer 0.2</div>
+    </div>
+  </div>
+
+  <!-- Menus -->
+  <div class="menubar">
+    <div class="menu-item" onclick="toggleMenu(this)">
+      File
+      <div class="dropdown">
+        <div class="dd-item" onclick="triggerOpen()">Open model file… <span class="kbd">Ctrl+O</span></div>
+        <div class="dd-item" onclick="triggerImport()">Import model file…</div>
+        <div class="dd-item" onclick="importConfigs()">Open config file…</div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" onclick="saveModel()">Save model as… </div>
+        <div class="dd-item" onclick="saveConfigs()">Save configurations as…</div>
+        <div class="dd-sep"></div>
+        <div class="dd-item">Exit</div>
+      </div>
+    </div>
+    <div class="menu-item" onclick="toggleMenu(this)">
+      Edit
+      <div class="dropdown">
+        <div class="dd-item">Undo <span class="kbd">Ctrl+Z</span></div>
+        <div class="dd-item">Redo <span class="kbd">Ctrl+Y</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item">Cut <span class="kbd">Ctrl+X</span></div>
+        <div class="dd-item">Copy <span class="kbd">Ctrl+C</span></div>
+        <div class="dd-item">Paste <span class="kbd">Ctrl+V</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" onclick="callSearch()">Search <span class="kbd">Ctrl+F</span></div>
+        <div class="dd-item">Replace <span class="kbd">Ctrl+R</span></div>
+        <div class="dd-sep"></div>
+        <div class="dd-item" onclick="clearLog()">Clear log</div>
+      </div>
+    </div>
+    <div class="menu-item" onclick="toggleMenu(this)">
+      Help
+      <div class="dropdown">
+        <div class="dd-item">Documentation <span class="kbd">F1</span></div>
+        <div class="dd-item" onclick="showAbout()">About…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-pill">
+    <div class="status-dot" id="modelDot"></div>
+    <span id="fileNamePill">No model loaded</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ TAB BAR ═══════════════════ -->
+<div class="tabbar">
+  <div class="tab active" id="tab1" onclick="switchTab(1)">
+    <span class="tab-num">1</span> Define Model
+  </div>
+  <div class="tab disabled" id="tab2" onclick="switchTab(2)">
+    <span class="tab-num">2</span> Spin Configurations &amp; Couplings
+  </div>
+  <div class="tab disabled" id="tab3" onclick="switchTab(3)">
+    <span class="tab-num">3</span> Set Energies &amp; Evaluate
+  </div>
+</div>
+
+<!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
+<div class="main">
+
+  <!-- ─── PAGE 1: Define Model ─── -->
+  <div class="page active" id="page1">
+
+    <div class="p1-sidebar">
+      <!-- Add Bonds -->
+      <div class="panel-label">Add bonds</div>
+      <div class="section-block">
+        <div class="field-row">
+          <span class="field-label">Discretization:</span>
+          <input type="number" id="p1-discr" value="0.02" step="0.01">
+        </div>
+        <div class="field-row">
+          <span class="field-label">rmin (Å):</span>
+          <input type="number" id="p1-rmin" value="0.0" step="0.1">
+        </div>
+        <div class="field-row">
+          <span class="field-label">rmax (Å):</span>
+          <input type="number" id="p1-rmax" value="4.9" step="0.1">
+        </div>
+        <button class="btn primary btn-full" onclick="addBonds()">
+          ⬡ Add bonds
+        </button>
+      </div>
+
+      <!-- Grow Lattice (disabled - not yet implemented) -->
+      <div class="panel-label">Grow lattice</div>
+      <div class="section-block">
+        <div class="field-row">
+          <span class="field-label">Lx:</span>
+          <input type="number" id="p1-lx" value="1" min="1" step="1">
+        </div>
+        <div class="field-row">
+          <span class="field-label">Ly:</span>
+          <input type="number" id="p1-ly" value="1" min="1" step="1">
+        </div>
+        <div class="field-row">
+          <span class="field-label">Lz:</span>
+          <input type="number" id="p1-lz" value="1" min="1" step="1">
+        </div>
+        <button class="btn btn-full disabled" data-tip="Not yet implemented">
+          ↗ Grow unit cell
+        </button>
+      </div>
+
+      <!-- Load -->
+      <div class="panel-label">Load</div>
+      <div class="section-block">
+        <div class="upload-zone" onclick="triggerOpen()">
+          <div class="upload-icon">⬡</div>
+          <div>Drop .cif / .struct here</div>
+          <div style="margin-top:4px;font-size:11px;color:var(--text3)">or click to browse</div>
+        </div>
+        <input type="file" id="fileInput" accept=".cif,.struct" style="display:none" onchange="loadFile(this)">
+      </div>
+    </div>
+
+    <!-- CIF editor -->
+    <div class="p1-editor">
+      <div class="panel-label">Model file (CIF)</div>
+      <textarea class="editor-area" id="modelEditor" spellcheck="false" placeholder="# Open a .cif or .struct file to start...
+# Or paste your CIF content here.
+#
+# Workflow:
+#  1. Open a .CIF file with the site positions
+#  2. Enter parameters and press Add bonds
+#  3. Go to tab 2 to optimize spin configurations
+#  4. With ab-initio energies press Estimate Parameters"></textarea>
+      <div class="editor-toolbar">
+        <button class="btn" onclick="triggerOpen()">Open .cif</button>
+        <button class="btn" onclick="saveModel()">Save</button>
+        <span class="editor-stat" id="modelStat">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── PAGE 2: Spin Configurations ─── -->
+  <div class="page" id="page2">
+
+    <div class="p2-sidebar">
+      <!-- Load from other model -->
+      <div class="panel-label">Load</div>
+      <div class="section-block">
+        <button class="btn btn-full" onclick="openImportModal()">
+          ↗ Load configs from other model
+        </button>
+      </div>
+
+      <!-- Optimize -->
+      <div class="panel-label">Optimize</div>
+      <div class="section-block">
+        <div class="field-row">
+          <span class="field-label">Num. configs:</span>
+          <input type="number" id="p2-nconf" value="10" min="1" step="1">
+        </div>
+        <div class="field-row">
+          <span class="field-label">Bunch size:</span>
+          <input type="number" id="p2-bunch" value="10" min="1" step="1">
+        </div>
+        <div class="field-row">
+          <span class="field-label">Iterations:</span>
+          <input type="number" id="p2-iter" value="100" min="1" step="1">
+        </div>
+        <button class="btn primary btn-full" onclick="optimizeConfigs()">
+          ⬟ Optimize
+        </button>
+        <button class="btn btn-full" style="margin-top:6px" onclick="optimalIndepSet()">
+          ◈ Optimal independent set
+        </button>
+      </div>
+
+      <!-- Format -->
+      <div class="panel-label">Output format</div>
+      <div class="section-block">
+        <div class="field-row">
+          <span class="field-label">Format:</span>
+          <select id="p2-format" onchange="recalcEquations()">
+            <option value="plain">Plain</option>
+            <option value="latex">LaTeX</option>
+            <option value="wolfram">Wolfram</option>
+          </select>
+        </div>
+        <button class="btn btn-full" onclick="recalcEquations()">↺ Recalculate</button>
+      </div>
+    </div>
+
+    <!-- Config editor -->
+    <div class="p2-center">
+      <div class="panel-label">Configuration file</div>
+      <textarea class="editor-area" id="spinEditor" spellcheck="false"
+        placeholder="# Spin configurations definition file
+# Energy    [config]    # label / comment
+#
+# Example:
+# nan   [0,1,0,1,0,1,0]  # conf_1
+# nan   [1,0,1,0,1,0,1]  # conf_2"></textarea>
+      <div class="editor-toolbar">
+        <button class="btn" onclick="importConfigs()">Open .spin</button>
+        <button class="btn" onclick="saveConfigs()">Save</button>
+        <span class="editor-stat" id="spinStat">—</span>
+      </div>
+    </div>
+
+    <!-- Results panel -->
+    <div class="p2-results">
+      <div class="result-panel">
+        <div class="panel-label">Equations</div>
+        <textarea class="result-text" id="p2-equations" readonly placeholder="Equations will appear here after loading configurations…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── PAGE 3: Set Energies & Evaluate ─── -->
+  <div class="page" id="page3">
+
+    <div class="p3-sidebar">
+      <!-- Settings -->
+      <div class="panel-label">Settings</div>
+      <div class="section-block">
+        <div class="field-row">
+          <span class="field-label">Energy tol.:</span>
+          <input type="number" id="p3-tol" value="0.001" step="0.0001">
+        </div>
+      </div>
+
+      <!-- Error method -->
+      <div class="panel-label">Error bound method</div>
+      <div class="section-block">
+        <div class="radio-group">
+          <label class="radio-row">
+            <input type="radio" name="errmethod" value="quad" onchange="toggleMcParams(false)"> Quadratic bound
+          </label>
+          <label class="radio-row active">
+            <input type="radio" name="errmethod" value="mc" checked onchange="toggleMcParams(true)"> Monte Carlo
+          </label>
+        </div>
+        <div class="mc-params" id="mcParams">
+          <div class="field-row">
+            <span class="field-label">Num. samples:</span>
+            <input type="number" id="p3-mcsteps" value="1000" step="100">
+          </div>
+          <div class="field-row">
+            <span class="field-label">Size factor:</span>
+            <input type="number" id="p3-mcfactor" value="1.0" step="0.1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Format -->
+      <div class="panel-label">Output format</div>
+      <div class="section-block">
+        <div class="field-row">
+          <span class="field-label">Format:</span>
+          <select id="p3-format" onchange="recalcEquations2()">
+            <option value="plain">Plain</option>
+            <option value="latex">LaTeX</option>
+            <option value="wolfram">Wolfram</option>
+          </select>
+        </div>
+        <button class="btn success btn-full" onclick="estimateParameters()">
+          ⬗ Estimate parameters
+        </button>
+      </div>
+    </div>
+
+    <!-- Configs + energies editor -->
+    <div class="p3-center">
+      <div class="panel-label">Configurations with energies</div>
+      <textarea class="editor-area" id="energyEditor" spellcheck="false"
+        placeholder="# Spin configurations definition file
+# Energy    [config]    # label / comment
+#
+# Once you have run ab-initio simulations,
+# replace the 'nan' values with the DFT energies.
+#
+# Example:
+# 143121.12   [0,0,0,0,0,0,0]  # Ferro up
+# 143121.02   [1,1,0,0,1,1,1]  # Disorder1
+# 143121.24   [1,0,1,1,1,1,0]  # Disorder2"></textarea>
+      <div class="editor-toolbar">
+        <button class="btn" onclick="importConfigs()">Open .spin</button>
+        <button class="btn" onclick="saveConfigs()">Save</button>
+        <span class="editor-stat" id="energyStat">—</span>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="p3-results">
+      <!-- Equations panel -->
+      <div class="result-panel" style="flex:0 0 35%">
+        <div class="panel-label">Equations</div>
+        <textarea class="result-text" id="p3-equations" readonly placeholder="Equations with known energies…"></textarea>
+      </div>
+
+      <!-- Parameters panel -->
+      <div class="result-panel" style="flex:1">
+        <div class="panel-label">Determined parameters</div>
+        <div class="param-cards" id="paramCards">
+          <div style="color:var(--text3);font-size:12px;padding:8px 0">
+            Run "Estimate parameters" to see results.
+          </div>
+        </div>
+      </div>
+
+      <!-- Energy errors panel -->
+      <div class="result-panel" style="flex:0 0 40%">
+        <div class="panel-label">Energy errors  <span id="chiStatus" style="font-size:10px;color:var(--text3);font-weight:400;margin-left:8px"></span></div>
+        <div style="flex:1;overflow:hidden;display:flex;align-items:stretch" id="chiPanel">
+          <div style="color:var(--text3);font-size:12px;padding:12px">Run "Estimate parameters" to see results.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ STATUS / LOG BAR ═══════════════════ -->
+<div class="statusbar">
+  <div class="log-logo">
+    <svg width="36" height="36" viewBox="0 0 28 28">
+      <polygon points="14,2 24,8 24,20 14,26 4,20 4,8" fill="none" stroke="#4a9eff" stroke-width="1.2"/>
+      <polygon points="14,7 20,10.5 20,17.5 14,21 8,17.5 8,10.5" fill="rgba(74,158,255,0.1)" stroke="#7ec8e3" stroke-width="0.8"/>
+      <circle cx="14" cy="14" r="2" fill="#4a9eff"/>
+    </svg>
+  </div>
+  <div class="log-area" id="logArea">
+<span class="log-info"># Visualbond 0.2 — spectrojotometer interface</span>
+<span class="log-info"># Ready. Open a .cif file to start.</span>
+  </div>
+</div>
+<div class="statusline">
+  <div class="sl-item" id="slModel">
+    <div class="dot"></div>
+    <span id="slModelTxt">No model loaded</span>
+  </div>
+  <div class="sl-item" id="slBonds">
+    <div class="dot"></div>
+    <span id="slBondsTxt">No bonds</span>
+  </div>
+  <div class="sl-item" id="slConfs">
+    <div class="dot"></div>
+    <span id="slConfsTxt">0 configurations</span>
+  </div>
+</div>
+
+<!-- ═══════════════════ IMPORT MODAL ═══════════════════ -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <div class="modal-header">
+      Import configurations from another model
+      <div class="modal-close" onclick="closeImportModal()">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="section-block" style="background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);padding:14px">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div class="section-title">Model file</div>
+            <button class="btn" onclick="log('Browse other model…')">Browse…</button>
+          </div>
+          <div style="flex:1">
+            <div class="section-title">Site map</div>
+            <input type="text" id="siteMap" style="width:100%" placeholder="e.g. 0, 1, 2, -1, 0">
+          </div>
+          <div>
+            <div class="section-title">Length tolerance</div>
+            <input type="number" id="importTol" value="0.1" step="0.01">
+          </div>
+        </div>
+      </div>
+      <div class="modal-row" style="flex:1;min-height:200px">
+        <div class="modal-col">
+          <div class="modal-col-label">Input configurations</div>
+          <textarea class="modal-textarea" id="importInput" placeholder="Paste or load configurations from other model…"></textarea>
+          <button class="btn" onclick="log('Load from file…')" style="margin-top:6px">Load from file…</button>
+        </div>
+        <div class="modal-col">
+          <div class="modal-col-label">Mapped to main model</div>
+          <textarea class="modal-textarea" id="importOutput" readonly placeholder="Mapped configurations will appear here…" style="opacity:.7"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" onclick="sendImportToApp()">↗ Send to application</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="mapConfigs()">Map configs</button>
+        <button class="btn" onclick="closeImportModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- hidden file input -->
+<input type="file" id="fileInputHidden" accept=".cif,.struct" style="display:none" onchange="loadFileHidden(this)">
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  Visualbond — API client
+//  Connects to FastAPI backend at API_BASE
+// ═══════════════════════════════════════════════════════════
+
+const API_BASE = '';  // empty = same origin as the server
+
+// ── State ──
+let sessionId   = null;
+let modelLoaded = false;
+let modelText   = '';
+let bondsCount  = 0;
+let confCount   = 0;
+
+// ── API helper ──
+async function api(method, path, body = null, isFormData = false) {
+  const opts = { method, headers: {} };
+  if (body && !isFormData) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  } else if (body) {
+    opts.body = body;   // FormData
+  }
+  try {
+    const r = await fetch(API_BASE + path, opts);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || JSON.stringify(data));
+    return data;
+  } catch (e) {
+    log('API error: ' + e.message, 'err');
+    throw e;
+  }
+}
+
+function setLoading(id, on) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.disabled = on;
+  el.style.opacity = on ? '0.5' : '1';
+}
+
+// ── Menu ──
+function toggleMenu(el) {
+  const wasOpen = el.classList.contains('open');
+  document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+  if (!wasOpen) el.classList.add('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.menu-item')) {
+    document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+  }
+});
+
+// ── Tabs ──
+function switchTab(n) {
+  const tab = document.getElementById('tab' + n);
+  if (tab.classList.contains('disabled')) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  tab.classList.add('active');
+  document.getElementById('page' + n).classList.add('active');
+}
+
+function enableTabs() {
+  document.getElementById('tab2').classList.remove('disabled');
+  document.getElementById('tab3').classList.remove('disabled');
+}
+
+// ── Log ──
+function log(msg, type='') {
+  const area = document.getElementById('logArea');
+  const span = document.createElement('span');
+  span.className = type ? 'log-' + type : '';
+  span.textContent = msg;
+  area.appendChild(document.createTextNode('\n'));
+  area.appendChild(span);
+  area.scrollTop = area.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('logArea').innerHTML = '<span class="log-info"># Log cleared.</span>';
+}
+
+// ── Status bar updates ──
+function updateStatus() {
+  const dot  = document.getElementById('modelDot');
+  const pill = document.getElementById('fileNamePill');
+  const slModel = document.getElementById('slModel');
+  const slBonds = document.getElementById('slBonds');
+  const slConfs = document.getElementById('slConfs');
+
+  if (modelLoaded) {
+    dot.classList.add('loaded');
+    slModel.classList.add('ok');
+    slBonds.className = bondsCount > 0 ? 'sl-item ok' : 'sl-item';
+    document.getElementById('slBondsTxt').textContent = bondsCount > 0 ? bondsCount + ' bond type(s)' : 'No bonds';
+  }
+  document.getElementById('slConfsTxt').textContent = confCount + ' configuration' + (confCount !== 1 ? 's' : '');
+  slConfs.className = confCount > 0 ? 'sl-item ok' : 'sl-item';
+}
+
+// ── File loading ──
+function triggerOpen() {
+  document.getElementById('fileInputHidden').click();
+}
+function triggerImport() {
+  document.getElementById('fileInputHidden').click();
+}
+
+async function loadFileHidden(input) {
+  const file = input.files[0];
+  if (!file) return;
+  log('Uploading ' + file.name + ' to server...');
+  setLoading('tabbar', true);
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const data = await api('POST', '/model/upload', form, true);
+    sessionId   = data.session_id;
+    modelText   = data.cif_text;
+    modelLoaded = true;
+    bondsCount  = data.bonds.length;
+    document.getElementById('modelEditor').value = modelText;
+    document.getElementById('fileNamePill').textContent = file.name;
+    document.getElementById('modelStat').textContent = modelText.split('\n').length + ' lines';
+    enableTabs();
+    updateStatus();
+    log('Model loaded: ' + file.name);
+    log('Atoms: ' + data.num_atoms + '  Cell size: ' + data.cell_size + '  Bonds: ' + bondsCount);
+    setConfigsText('');  // reset configs when a new model is loaded
+  } catch(e) {
+    // error already logged
+  } finally {
+    setLoading('tabbar', false);
+    input.value = '';
+  }
+}
+
+function loadFile(input) { loadFileHidden(input); }
+
+// ── Page 1 actions ──
+async function addBonds() {
+  if (!modelLoaded) { log('Error: no model loaded.', 'err'); return; }
+  const rmin  = parseFloat(document.getElementById('p1-rmin').value);
+  const rmax  = parseFloat(document.getElementById('p1-rmax').value);
+  const discr = parseFloat(document.getElementById('p1-discr').value);
+  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr);
+  try {
+    const data = await api('POST', '/model/add_bonds', {
+      session_id: sessionId, rmin, rmax, discretization: discr
+    });
+    document.getElementById('modelEditor').value = data.cif_text;
+    document.getElementById('modelStat').textContent = data.cif_text.split('\n').length + ' lines';
+    bondsCount = data.num_bonds;
+    updateStatus();
+    log('Bonds added: ' + data.bonds.map(b => b.name).join(', ') + '  (' + data.num_bonds + ' type(s))');
+  } catch(e) {}
+}
+
+// ── Page 2 actions ──
+async function optimizeConfigs() {
+  if (!modelLoaded) { log('Error: no model loaded.', 'err'); return; }
+  const n  = parseInt(document.getElementById('p2-nconf').value);
+  const it = parseInt(document.getElementById('p2-iter').value);
+  const us = parseInt(document.getElementById('p2-bunch').value);
+  log('optconfs: num_configs=' + n + ' iterations=' + it + ' bunch=' + us);
+  try {
+    // Sync current config editor to session first
+    await syncAndParseConfigs();
+    const data = await api('POST', '/configs/optimize', {
+      session_id: sessionId, num_configs: n, bunch_size: us, iterations: it
+    });
+    const editor = document.getElementById('spinEditor');
+    editor.value += '\n' + data.new_configs_text;
+    document.getElementById('energyEditor').value = editor.value;
+    confCount = (editor.value.match(/^[^#\s]/gm) || []).length;
+    document.getElementById('spinStat').textContent = confCount + ' configs';
+    updateStatus();
+    log('Generated ' + data.num_new_configs + ' configs. |ΔJ|/|ΔE| < ' + data.condition_number.toFixed(4));
+    await recalcEquations();
+  } catch(e) {}
+}
+
+async function optimalIndepSet() {
+  if (!modelLoaded) { log('Error: no model loaded.', 'err'); return; }
+  log('optimal_independent_set...');
+  try {
+    await syncAndParseConfigs();
+    const data = await api('POST', '/configs/optimal_independent_set', {session_id: sessionId});
+    const editor = document.getElementById('spinEditor');
+    setConfigsText(editor.value + '\n' + data.subset_text);
+    log('Optimal independent set. CN=' + data.condition_number.toFixed(4) + '  configs: ' + data.num_configs);
+  } catch(e) {}
+}
+
+async function recalcEquations() {
+  if (!sessionId) return;
+  const fmt  = document.getElementById('p2-format').value;
+  const text = document.getElementById('spinEditor').value;
+  try {
+    const data = await api('POST', '/configs/equations', {
+      session_id: sessionId, configs_text: text, output_format: fmt
+    });
+    document.getElementById('p2-equations').value = data.equations;
+    confCount = data.equations ? text.match(/^[^#\s]/gm)?.length || 0 : 0;
+    document.getElementById('spinStat').textContent = confCount + ' configs';
+    updateStatus();
+  } catch(e) {}
+}
+
+async function recalcEquations2() {
+  if (!sessionId) return;
+  const fmt  = document.getElementById('p3-format').value;
+  const text = document.getElementById('energyEditor').value;
+  try {
+    const data = await api('POST', '/configs/equations', {
+      session_id: sessionId, configs_text: text, output_format: fmt
+    });
+    document.getElementById('p3-equations').value = data.equations;
+  } catch(e) {}
+}
+
+async function syncAndParseConfigs() {
+  if (!sessionId) return;
+  const text = document.getElementById('spinEditor').value;
+  try {
+    await api('POST', '/configs/parse', {
+      session_id: sessionId, configs_text: text, output_format: 'plain'
+    });
+  } catch(e) { /* parse errors are shown in log */ }
+}
+
+// ── Page 3 actions ──
+function toggleMcParams(on) {
+  document.getElementById('mcParams').classList.toggle('hidden', !on);
+}
+
+async function estimateParameters() {
+  if (!modelLoaded) { log('Error: no model loaded.', 'err'); return; }
+  const tol    = parseFloat(document.getElementById('p3-tol').value);
+  const usemc  = document.querySelector('input[name="errmethod"]:checked').value === 'mc';
+  const steps  = parseInt(document.getElementById('p3-mcsteps').value);
+  const factor = parseFloat(document.getElementById('p3-mcfactor').value);
+  const fmt    = document.getElementById('p3-format').value;
+  const text   = document.getElementById('energyEditor').value;
+  log('evaluate_cc: tolerance=' + tol + ' montecarlo=' + usemc);
+  try {
+    const data = await api('POST', '/evaluate', {
+      session_id: sessionId,
+      configs_text: text,
+      energy_tolerance: tol,
+      use_montecarlo: usemc,
+      mc_steps: steps,
+      mc_size_factor: factor,
+      output_format: fmt
+    });
+    // Equations
+    document.getElementById('p3-equations').value = data.equations;
+    // Parameter cards
+    const cards = document.getElementById('paramCards');
+    cards.innerHTML = '';
+    data.parameters.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'param-card' + (p.incompatible ? ' incompatible' : '');
+      const valStr = p.value !== null ? (p.value >= 0 ? '+' : '') + p.value.toExponential(4) : '—';
+      const errStr = p.error !== null ? '± ' + Math.abs(p.error).toExponential(3) : '';
+      const normStr = (p.value_normalized !== undefined)
+        ? ' (' + (p.value_normalized >= 0 ? '+' : '') + p.value_normalized.toFixed(4) + ' × ' + data.jmax.toExponential(3) + ')'
+        : '';
+      card.innerHTML = '<span class="param-name">' + p.name + '</span>'
+        + '<span class="param-val">' + valStr + normStr + '</span>'
+        + '<span class="param-err">' + errStr + (p.incompatible ? ' ⚠ incompatible' : '') + '</span>';
+      cards.appendChild(card);
+    });
+    // Chi panel — inline SVG chart
+    window._lastChiData = { chis: data.chis, labels: data.chi_labels };
+    renderChiChart(data.chis, data.chi_labels);
+    const incompMsg = data.incompatible ? ' ⚠ Incompatible model!' : '';
+    log('Parameters estimated. jmax=' + data.jmax.toExponential(3)
+        + '  configs used: ' + data.num_configs_used + incompMsg);
+    if (data.incompatible) log('Warning: error bounds suggest model is not compatible with the data.', 'warn');
+  } catch(e) {}
+}
+
+function renderChiChart(chis, labels) {
+  const panel = document.getElementById('chiPanel');
+  if (!chis || chis.length === 0) {
+    panel.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px">No data.</div>';
+    return;
+  }
+
+  const W = panel.clientWidth  || 320;
+  const H = panel.clientHeight || 200;
+  const PAD = { top: 18, right: 16, bottom: 52, left: 44 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top  - PAD.bottom;
+
+  // Scale: y range covers ±max(|chi|, 1.2) with a bit of padding
+  const maxAbs = Math.max(...chis.map(Math.abs), 1.2);
+  const yMax   =  maxAbs * 1.15;
+  const yMin   = -maxAbs * 1.15;
+  const yScale = v => PAD.top + chartH * (1 - (v - yMin) / (yMax - yMin));
+  const xStep  = chartW / chis.length;
+  const xPos   = i => PAD.left + xStep * i + xStep / 2;
+
+  // Y grid lines
+  const yTicks = [];
+  const step = maxAbs > 3 ? 1 : 0.5;
+  for (let v = Math.ceil(yMin / step) * step; v <= yMax + 1e-9; v = Math.round((v + step) * 1e9) / 1e9) {
+    yTicks.push(v);
+  }
+
+  let svg = `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg"
+    style="font-family:var(--mono);overflow:visible">`;
+
+  // Grid lines
+  yTicks.forEach(v => {
+    const y = yScale(v);
+    const isZero = Math.abs(v) < 1e-9;
+    const isRef  = Math.abs(Math.abs(v) - 1) < 1e-9;
+    const color  = isZero ? 'rgba(255,255,255,0.15)'
+                 : isRef  ? 'rgba(246,166,35,0.35)'
+                 :           'rgba(255,255,255,0.06)';
+    const dash = isRef ? '4,3' : '';
+    svg += `<line x1="${PAD.left}" y1="${y}" x2="${PAD.left + chartW}" y2="${y}"
+              stroke="${color}" stroke-width="${isZero||isRef?1.2:0.6}" ${dash?`stroke-dasharray="${dash}"`:''} />`;
+    svg += `<text x="${PAD.left - 6}" y="${y + 4}" text-anchor="end"
+              font-size="9" fill="${isRef?'#f6a623':'#556070'}">${v % 1 === 0 ? v : v.toFixed(1)}</text>`;
+  });
+
+  // ±1 labels
+  svg += `<text x="${PAD.left + chartW + 4}" y="${yScale(1)  + 4}" font-size="9" fill="#f6a623">+1</text>`;
+  svg += `<text x="${PAD.left + chartW + 4}" y="${yScale(-1) + 4}" font-size="9" fill="#f6a623">−1</text>`;
+
+  // Bars
+  const barW = Math.max(xStep * 0.5, 4);
+  chis.forEach((chi, i) => {
+    const x    = xPos(i);
+    const yTop = yScale(Math.max(chi, 0));
+    const yBot = yScale(Math.min(chi, 0));
+    const barH = Math.max(Math.abs(yBot - yTop), 2);
+    const color = Math.abs(chi) > 1 ? '#ff5a5a'
+                : Math.abs(chi) > 0.7 ? '#f6a623'
+                : '#3ecf8e';
+    svg += `<rect x="${x - barW/2}" y="${yTop}" width="${barW}" height="${barH}"
+              fill="${color}" opacity="0.85" rx="2"/>`;
+    // dot on top
+    const dotY = chi >= 0 ? yTop - 3 : yBot + 3;
+    svg += `<circle cx="${x}" cy="${yScale(chi)}" r="3" fill="${color}"/>`;
+    // value label above/below the bar
+    const lblY = chi >= 0 ? yTop - 7 : yBot + 14;
+    svg += `<text x="${x}" y="${lblY}" text-anchor="middle" font-size="9"
+              fill="${color}">${chi.toFixed(2)}</text>`;
+    // x-axis label (rotated)
+    const lbl = labels && labels[i] ? labels[i].trim().replace(/^#\s*/, '') : ('ΔE' + (i+1));
+    const shortLbl = lbl.length > 12 ? lbl.slice(0, 11) + '…' : lbl;
+    svg += `<text x="${x}" y="${PAD.top + chartH + 14}" text-anchor="end"
+              font-size="9" fill="#8a9bb5"
+              transform="rotate(-40 ${x} ${PAD.top + chartH + 14})">${shortLbl}</text>`;
+  });
+
+  // Zero baseline
+  svg += `<line x1="${PAD.left}" y1="${yScale(0)}" x2="${PAD.left+chartW}" y2="${yScale(0)}"
+            stroke="rgba(255,255,255,0.2)" stroke-width="1"/>`;
+
+  // Axes
+  svg += `<line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${PAD.top+chartH}"
+            stroke="#2a3350" stroke-width="1"/>`;
+
+  // Y axis title
+  svg += `<text x="11" y="${PAD.top + chartH/2}" text-anchor="middle" font-size="9" fill="#556070"
+            transform="rotate(-90 11 ${PAD.top + chartH/2})">ΔEᵢ / ΔE</text>`;
+
+  svg += '</svg>';
+
+  panel.innerHTML = svg;
+
+  // Status badge
+  const bad = chis.filter(c => Math.abs(c) > 1).length;
+  const status = document.getElementById('chiStatus');
+  if (status) {
+    status.textContent = bad > 0 ? '⚠ ' + bad + ' out of bounds' : '✓ all within bounds';
+    status.style.color = bad > 0 ? 'var(--amber)' : 'var(--green)';
+  }
+}
+
+// ── File I/O helpers ──
+function saveModel() {
+  const content = document.getElementById('modelEditor').value;
+  if (!content.trim()) { log('Nothing to save.', 'warn'); return; }
+  download(content, 'model.cif', 'text/plain');
+  log('Model saved.');
+}
+
+function importConfigs() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.spin,.txt';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      setConfigsText(ev.target.result);
+      confCount = (ev.target.result.match(/^[^#\s]/gm) || []).length;
+      updateStatus();
+      log('Config loaded: ' + file.name);
+      switchTab(2);
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function saveConfigs() {
+  const activeTab = document.querySelector('.tab.active').id;
+  const content = activeTab === 'tab3'
+    ? document.getElementById('energyEditor').value
+    : document.getElementById('spinEditor').value;
+  if (!content.trim()) { log('Nothing to save.', 'warn'); return; }
+  download(content, 'configurations.spin', 'text/plain');
+  log('Configurations saved.');
+}
+
+function download(content, filename, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type: mime}));
+  a.download = filename;
+  a.click();
+}
+
+// ── Import modal ──
+function openImportModal() {
+  if (!modelLoaded) { log('Error: load a model first.', 'err'); return; }
+  document.getElementById('importModal').classList.add('open');
+}
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('open');
+}
+function mapConfigs() {
+  log('Map configurations: energy_scale applied, site map translation done.');
+  const input = document.getElementById('importInput').value;
+  if (!input.trim()) return;
+  document.getElementById('importOutput').value = input
+    .split('\n')
+    .map(l => l.trim().startsWith('#') || l.trim() === '' ? l : '# (mapped) ' + l)
+    .join('\n');
+}
+function sendImportToApp() {
+  const mapped = document.getElementById('importOutput').value;
+  if (mapped.trim()) {
+    setConfigsText(document.getElementById('spinEditor').value + '\n\n# From imported model\n' + mapped + '\n' + '# '.repeat(20) + '\n\n');
+    log('Configurations imported into main application.');
+  }
+  closeImportModal();
+}
+
+// ── Search ──
+function callSearch() {
+  const query = prompt('Find:');
+  if (!query) return;
+  const activeTab = document.querySelector('.tab.active').id;
+  const areas = {tab1:'modelEditor', tab2:'spinEditor', tab3:'energyEditor'};
+  const el = document.getElementById(areas[activeTab] || 'modelEditor');
+  const text = el.value;
+  const idx = text.indexOf(query);
+  if (idx < 0) { alert('Not found: ' + query); return; }
+  el.focus();
+  el.setSelectionRange(idx, idx + query.length);
+}
+
+// ── About ──
+function showAbout() {
+  alert('Visualbond 0.2 — 2024\nspectrojotometer web interface\n\nA tool to determine coupling constants\nin Heisenberg-like magnetic models\nfrom ab initio simulations.\n\nIFLP-CONICET / UNLP');
+}
+
+// ── Tab sync — mirrors the Tkinter behaviour ──────────────────────────────────
+//
+// The two config editors (tab 2 = spinEditor, tab 3 = energyEditor) share the
+// same underlying data.  The rule, same as in the Tkinter app, is:
+//
+//   • Leaving a tab  → save its content into the shared `configsText` state.
+//   • Entering a tab → load `configsText` into its editor, then recalculate.
+//
+// This means edits in either tab are always preserved and reflected in the other.
+
+let configsText = '';   // shared state, mirrors what Tkinter keeps in the model
+
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
+const debouncedRecalc  = debounce(recalcEquations,  800);
+const debouncedRecalc2 = debounce(recalcEquations2, 800);
+
+// Called by switchTab() — runs BEFORE the tab visually changes.
+function onLeaveTab(previousTabId) {
+  if (previousTabId === 'tab2') {
+    configsText = document.getElementById('spinEditor').value;
+  } else if (previousTabId === 'tab3') {
+    configsText = document.getElementById('energyEditor').value;
+  }
+}
+
+// Called by switchTab() — runs AFTER the tab visually changes.
+function onEnterTab(newTabId) {
+  if (newTabId === 'tab2') {
+    document.getElementById('spinEditor').value = configsText;
+    if (sessionId) debouncedRecalc();
+  } else if (newTabId === 'tab3') {
+    document.getElementById('energyEditor').value = configsText;
+    if (sessionId) debouncedRecalc2();
+  }
+}
+
+// Patch switchTab to call the hooks.
+// switchTab is now async: leaving tab1 validates the CIF first.
+const _switchTabOrig = switchTab;
+switchTab = async function(n) {
+  const prev = document.querySelector('.tab.active');
+  const prevId = prev ? prev.id : null;
+
+  // Leaving tab 1: validate the CIF editor content before allowing the switch
+  if (prevId === 'tab1') {
+    const cif_text = document.getElementById('modelEditor').value.trim();
+    if (!cif_text) {
+      log('Cannot switch tab: model editor is empty.', 'err');
+      return;
+    }
+    if (!sessionId) {
+      log('Cannot switch tab: no session. Load a .cif file first.', 'err');
+      return;
+    }
+    // Show inline validation state in the status bar
+    document.getElementById('slModelTxt').textContent = 'Validating…';
+    try {
+      const data = await api('POST', `/model/${sessionId}/validate`, { cif_text });
+      // Update status with fresh model info
+      bondsCount = data.bonds.length;
+      document.getElementById('slModelTxt').textContent =
+        'Model OK — ' + data.num_atoms + ' atoms, ' + data.cell_size + ' sites';
+      document.getElementById('slBondsTxt').textContent =
+        bondsCount > 0 ? bondsCount + ' bond type(s)' : 'No bonds';
+      document.getElementById('slModel').classList.add('ok');
+      log('Model validated. atoms=' + data.num_atoms
+          + '  cell_size=' + data.cell_size
+          + '  bonds=' + bondsCount);
+    } catch(e) {
+      // api() already logged the error; keep user on tab 1
+      document.getElementById('slModelTxt').textContent = 'Invalid model';
+      document.getElementById('slModel').classList.remove('ok');
+      document.getElementById('slModel').classList.add('err');
+      return;   // ← block the tab switch
+    }
+  }
+
+  onLeaveTab(prevId);
+  _switchTabOrig(n);
+  onEnterTab('tab' + n);
+};
+
+// Helper used by optimizeConfigs, sendImportToApp, importConfigs, etc.
+// to update shared state and refresh both editors at once.
+function setConfigsText(text) {
+  configsText = text;
+  document.getElementById('spinEditor').value   = text;
+  document.getElementById('energyEditor').value = text;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Typing in either editor updates the shared state and recalculates.
+  document.getElementById('spinEditor').addEventListener('input', () => {
+    configsText = document.getElementById('spinEditor').value;
+    debouncedRecalc();
+  });
+
+  document.getElementById('energyEditor').addEventListener('input', () => {
+    configsText = document.getElementById('energyEditor').value;
+    debouncedRecalc2();
+  });
+
+  // Re-render chi chart on resize so the SVG fills the panel
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => {
+      if (window._lastChiData) renderChiChart(window._lastChiData.chis, window._lastChiData.labels);
+    }).observe(document.getElementById('chiPanel'));
+  }
+});
+</script>
+</body>
+</html>
