@@ -1211,7 +1211,7 @@ async function loadFileHidden(input) {
     updateStatus();
     log('Model loaded: ' + file.name);
     log('Atoms: ' + data.num_atoms + '  Cell size: ' + data.cell_size + '  Bonds: ' + bondsCount);
-    syncConfigEditors();
+    setConfigsText('');  // reset configs when a new model is loaded
   } catch(e) {
     // error already logged
   } finally {
@@ -1272,8 +1272,7 @@ async function optimalIndepSet() {
     await syncAndParseConfigs();
     const data = await api('POST', '/configs/optimal_independent_set', {session_id: sessionId});
     const editor = document.getElementById('spinEditor');
-    editor.value += '\n' + data.subset_text;
-    document.getElementById('energyEditor').value = editor.value;
+    setConfigsText(editor.value + '\n' + data.subset_text);
     log('Optimal independent set. CN=' + data.condition_number.toFixed(4) + '  configs: ' + data.num_configs);
   } catch(e) {}
 }
@@ -1313,14 +1312,6 @@ async function syncAndParseConfigs() {
       session_id: sessionId, configs_text: text, output_format: 'plain'
     });
   } catch(e) { /* parse errors are shown in log */ }
-}
-
-function syncConfigEditors() {
-  const src = document.getElementById('spinEditor').value;
-  const dst = document.getElementById('energyEditor');
-  if (!dst.value || dst.value.trim().startsWith('#')) {
-    dst.value = src;
-  }
 }
 
 // ── Page 3 actions ──
@@ -1494,8 +1485,7 @@ function importConfigs() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      document.getElementById('spinEditor').value = ev.target.result;
-      document.getElementById('energyEditor').value = ev.target.result;
+      setConfigsText(ev.target.result);
       confCount = (ev.target.result.match(/^[^#\s]/gm) || []).length;
       updateStatus();
       log('Config loaded: ' + file.name);
@@ -1543,9 +1533,8 @@ function mapConfigs() {
 function sendImportToApp() {
   const mapped = document.getElementById('importOutput').value;
   if (mapped.trim()) {
-    document.getElementById('spinEditor').value += '\n\n# From imported model\n' + mapped + '\n' + '# '.repeat(20) + '\n\n';
+    setConfigsText(document.getElementById('spinEditor').value + '\n\n# From imported model\n' + mapped + '\n' + '# '.repeat(20) + '\n\n');
     log('Configurations imported into main application.');
-    syncConfigEditors();
   }
   closeImportModal();
 }
@@ -1569,8 +1558,18 @@ function showAbout() {
   alert('Visualbond 0.2 — 2024\nspectrojotometer web interface\n\nA tool to determine coupling constants\nin Heisenberg-like magnetic models\nfrom ab initio simulations.\n\nIFLP-CONICET / UNLP');
 }
 
-// ── Auto-sync between tabs ────────────────────────────────────────────────────
-// Debounce: wait 800ms after the user stops typing before hitting the API
+// ── Tab sync — mirrors the Tkinter behaviour ──────────────────────────────────
+//
+// The two config editors (tab 2 = spinEditor, tab 3 = energyEditor) share the
+// same underlying data.  The rule, same as in the Tkinter app, is:
+//
+//   • Leaving a tab  → save its content into the shared `configsText` state.
+//   • Entering a tab → load `configsText` into its editor, then recalculate.
+//
+// This means edits in either tab are always preserved and reflected in the other.
+
+let configsText = '';   // shared state, mirrors what Tkinter keeps in the model
+
 function debounce(fn, ms) {
   let timer;
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
@@ -1579,34 +1578,54 @@ function debounce(fn, ms) {
 const debouncedRecalc  = debounce(recalcEquations,  800);
 const debouncedRecalc2 = debounce(recalcEquations2, 800);
 
-document.addEventListener('DOMContentLoaded', () => {
-  const spinEditor   = document.getElementById('spinEditor');
-  const energyEditor = document.getElementById('energyEditor');
+// Called by switchTab() — runs BEFORE the tab visually changes.
+function onLeaveTab(previousTabId) {
+  if (previousTabId === 'tab2') {
+    configsText = document.getElementById('spinEditor').value;
+  } else if (previousTabId === 'tab3') {
+    configsText = document.getElementById('energyEditor').value;
+  }
+}
 
-  // Tab 2 editor: mirror to tab 3 + recalculate equations
-  spinEditor.addEventListener('input', () => {
-    if (!energyEditor.dataset.diverged) {
-      energyEditor.value = spinEditor.value;
-    }
+// Called by switchTab() — runs AFTER the tab visually changes.
+function onEnterTab(newTabId) {
+  if (newTabId === 'tab2') {
+    document.getElementById('spinEditor').value = configsText;
+    if (sessionId) debouncedRecalc();
+  } else if (newTabId === 'tab3') {
+    document.getElementById('energyEditor').value = configsText;
+    if (sessionId) debouncedRecalc2();
+  }
+}
+
+// Patch switchTab to call the hooks
+const _switchTabOrig = switchTab;
+switchTab = function(n) {
+  const prev = document.querySelector('.tab.active');
+  const prevId = prev ? prev.id : null;
+  onLeaveTab(prevId);
+  _switchTabOrig(n);
+  onEnterTab('tab' + n);
+};
+
+// Helper used by optimizeConfigs, sendImportToApp, importConfigs, etc.
+// to update shared state and refresh both editors at once.
+function setConfigsText(text) {
+  configsText = text;
+  document.getElementById('spinEditor').value   = text;
+  document.getElementById('energyEditor').value = text;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Typing in either editor updates the shared state and recalculates.
+  document.getElementById('spinEditor').addEventListener('input', () => {
+    configsText = document.getElementById('spinEditor').value;
     debouncedRecalc();
   });
 
-  // Tab 3 editor: recalculate equations; mark as diverged once user
-  // replaces 'nan' with real energies so tab 2 edits no longer overwrite it
-  energyEditor.addEventListener('input', () => {
-    const hasRealEnergy = energyEditor.value
-      .split('\n')
-      .some(l => { const t = l.trim(); return t && !t.startsWith('#') && !t.startsWith('nan'); });
-    if (hasRealEnergy) energyEditor.dataset.diverged = '1';
+  document.getElementById('energyEditor').addEventListener('input', () => {
+    configsText = document.getElementById('energyEditor').value;
     debouncedRecalc2();
-  });
-
-  // Switching tabs: refresh equations panel immediately
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      if (tab.id === 'tab3' && sessionId) debouncedRecalc2();
-      if (tab.id === 'tab2' && sessionId) debouncedRecalc();
-    });
   });
 
   // Re-render chi chart on resize so the SVG fills the panel
