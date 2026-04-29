@@ -27,4 +27,4 @@ where = ["."]
 include = ["visualbondweb*"]
 
 [tool.setuptools.package-data]
-visualbondweb = ["static/*"]
+visualbondweb = ["static/*", "static/**/*"]
