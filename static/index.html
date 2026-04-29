@@ -1598,11 +1598,47 @@ function onEnterTab(newTabId) {
   }
 }
 
-// Patch switchTab to call the hooks
+// Patch switchTab to call the hooks.
+// switchTab is now async: leaving tab1 validates the CIF first.
 const _switchTabOrig = switchTab;
-switchTab = function(n) {
+switchTab = async function(n) {
   const prev = document.querySelector('.tab.active');
   const prevId = prev ? prev.id : null;
+
+  // Leaving tab 1: validate the CIF editor content before allowing the switch
+  if (prevId === 'tab1') {
+    const cif_text = document.getElementById('modelEditor').value.trim();
+    if (!cif_text) {
+      log('Cannot switch tab: model editor is empty.', 'err');
+      return;
+    }
+    if (!sessionId) {
+      log('Cannot switch tab: no session. Load a .cif file first.', 'err');
+      return;
+    }
+    // Show inline validation state in the status bar
+    document.getElementById('slModelTxt').textContent = 'Validating…';
+    try {
+      const data = await api('POST', `/model/${sessionId}/validate`, { cif_text });
+      // Update status with fresh model info
+      bondsCount = data.bonds.length;
+      document.getElementById('slModelTxt').textContent =
+        'Model OK — ' + data.num_atoms + ' atoms, ' + data.cell_size + ' sites';
+      document.getElementById('slBondsTxt').textContent =
+        bondsCount > 0 ? bondsCount + ' bond type(s)' : 'No bonds';
+      document.getElementById('slModel').classList.add('ok');
+      log('Model validated. atoms=' + data.num_atoms
+          + '  cell_size=' + data.cell_size
+          + '  bonds=' + bondsCount);
+    } catch(e) {
+      // api() already logged the error; keep user on tab 1
+      document.getElementById('slModelTxt').textContent = 'Invalid model';
+      document.getElementById('slModel').classList.remove('ok');
+      document.getElementById('slModel').classList.add('err');
+      return;   // ← block the tab switch
+    }
+  }
+
   onLeaveTab(prevId);
   _switchTabOrig(n);
   onEnterTab('tab' + n);

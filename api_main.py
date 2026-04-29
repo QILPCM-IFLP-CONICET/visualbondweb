@@ -297,6 +297,40 @@ async def update_model_cif(session_id: str, file: UploadFile = File(...)):
     return {"status": "updated", "cell_size": model.lattice_properties.get("cell_size")}
 
 
+class ValidateCifRequest(BaseModel):
+    cif_text: str
+
+
+@app.post("/model/{session_id}/validate")
+def validate_and_update_cif(session_id: str, req: ValidateCifRequest):
+    """
+    Validate the CIF text from the editor and update the session model.
+    Called when the user leaves tab 1. Returns model info on success,
+    or raises 422 with a human-readable detail on parse failure.
+    """
+    sess = _get_session(session_id)
+    tmp = TMPDIR / f"{uuid.uuid4()}.cif"
+    tmp.write_text(req.cif_text)
+    try:
+        model = magnetic_model_from_file(filename=str(tmp))
+    except Exception as exc:
+        tmp.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=str(exc))
+    if sess["cif_path"]:
+        Path(sess["cif_path"]).unlink(missing_ok=True)
+    model.save_cif(str(tmp))
+    sess["model"] = model
+    sess["cif_path"] = str(tmp)
+    num_atoms = len(model.site_properties.get("coord_atomos", []))
+    bonds_info = [{"name": name} for name in model.bonds] if model.bonds else []
+    return {
+        "status": "ok",
+        "num_atoms": num_atoms,
+        "cell_size": model.lattice_properties.get("cell_size", 0),
+        "bonds": bonds_info,
+    }
+
+
 # ── Bond generation ───────────────────────────────────────────────────────────
 
 @app.post("/model/add_bonds")
