@@ -67,6 +67,7 @@ class AddBondsRequest(BaseModel):
     rmin: float = 0.0
     rmax: float = 4.9
     discretization: float = 0.02
+    supercell_size: list[int] = [1, 1, 1]
 
 
 class OptimizeConfigsRequest(BaseModel):
@@ -345,6 +346,8 @@ def add_bonds(req: AddBondsRequest):
         raise HTTPException(status_code=400, detail="No model loaded in session.")
 
     try:
+        # Pass a per-axis list; the library clamps each value to 1–4
+        model.lattice_properties["supercell_size"] = req.supercell_size
         model.generate_bonds(
             ranges=[[req.rmin, req.rmax]],
             discretization=req.discretization,

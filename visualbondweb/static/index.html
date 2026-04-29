@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Visualbond — Spectrojotometer</title>
+<link rel="icon" type="image/x-icon" href="/static/spectrojotometer.ico">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
@@ -673,13 +674,8 @@
 <!-- ═══════════════════ TOP BAR ═══════════════════ -->
 <div class="topbar">
   <div class="logo-area">
-    <div class="logo-hex">
-      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="14,2 24,8 24,20 14,26 4,20 4,8" fill="none" stroke="#4a9eff" stroke-width="1.5"/>
-        <polygon points="14,7 20,10.5 20,17.5 14,21 8,17.5 8,10.5" fill="rgba(74,158,255,0.12)" stroke="#7ec8e3" stroke-width="1"/>
-        <circle cx="14" cy="14" r="2.5" fill="#4a9eff"/>
-      </svg>
-    </div>
+    <img src="/static/logo.svg" alt="Visualbond logo"
+         style="height:34px;width:auto;border-radius:4px;background:#fff;padding:2px">
     <div>
       <div class="app-title">Visualbond</div>
       <div class="app-sub">spectrojotometer 0.2</div>
@@ -772,7 +768,7 @@
         </button>
       </div>
 
-      <!-- Grow Lattice (disabled - not yet implemented) -->
+      <!-- Grow Lattice: controls supercell_size for generate_bonds -->
       <div class="panel-label">Grow lattice</div>
       <div class="section-block">
         <div class="field-row">
@@ -787,8 +783,8 @@
           <span class="field-label">Lz:</span>
           <input type="number" id="p1-lz" value="1" min="1" step="1">
         </div>
-        <button class="btn btn-full disabled" data-tip="Not yet implemented">
-          ↗ Grow unit cell
+        <button class="btn btn-full" onclick="addBonds()">
+          ↗ Apply &amp; grow
         </button>
       </div>
 
@@ -1006,11 +1002,8 @@
 <!-- ═══════════════════ STATUS / LOG BAR ═══════════════════ -->
 <div class="statusbar">
   <div class="log-logo">
-    <svg width="36" height="36" viewBox="0 0 28 28">
-      <polygon points="14,2 24,8 24,20 14,26 4,20 4,8" fill="none" stroke="#4a9eff" stroke-width="1.2"/>
-      <polygon points="14,7 20,10.5 20,17.5 14,21 8,17.5 8,10.5" fill="rgba(74,158,255,0.1)" stroke="#7ec8e3" stroke-width="0.8"/>
-      <circle cx="14" cy="14" r="2" fill="#4a9eff"/>
-    </svg>
+    <img src="/static/logo.svg" alt="logo"
+         style="width:38px;height:auto;border-radius:3px;background:#fff;padding:2px;opacity:0.85">
   </div>
   <div class="log-area" id="logArea">
 <span class="log-info"># Visualbond 0.2 — spectrojotometer interface</span>
@@ -1211,7 +1204,7 @@ async function loadFileHidden(input) {
     updateStatus();
     log('Model loaded: ' + file.name);
     log('Atoms: ' + data.num_atoms + '  Cell size: ' + data.cell_size + '  Bonds: ' + bondsCount);
-    syncConfigEditors();
+    setConfigsText('');  // reset configs when a new model is loaded
   } catch(e) {
     // error already logged
   } finally {
@@ -1228,10 +1221,13 @@ async function addBonds() {
   const rmin  = parseFloat(document.getElementById('p1-rmin').value);
   const rmax  = parseFloat(document.getElementById('p1-rmax').value);
   const discr = parseFloat(document.getElementById('p1-discr').value);
-  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr);
+  const lx    = parseInt(document.getElementById('p1-lx').value) || 1;
+  const ly    = parseInt(document.getElementById('p1-ly').value) || 1;
+  const lz    = parseInt(document.getElementById('p1-lz').value) || 1;
+  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr + ' supercell=[' + [lx,ly,lz] + ']');
   try {
     const data = await api('POST', '/model/add_bonds', {
-      session_id: sessionId, rmin, rmax, discretization: discr
+      session_id: sessionId, rmin, rmax, discretization: discr, supercell_size: [lx, ly, lz]
     });
     document.getElementById('modelEditor').value = data.cif_text;
     document.getElementById('modelStat').textContent = data.cif_text.split('\n').length + ' lines';
@@ -1272,8 +1268,7 @@ async function optimalIndepSet() {
     await syncAndParseConfigs();
     const data = await api('POST', '/configs/optimal_independent_set', {session_id: sessionId});
     const editor = document.getElementById('spinEditor');
-    editor.value += '\n' + data.subset_text;
-    document.getElementById('energyEditor').value = editor.value;
+    setConfigsText(editor.value + '\n' + data.subset_text);
     log('Optimal independent set. CN=' + data.condition_number.toFixed(4) + '  configs: ' + data.num_configs);
   } catch(e) {}
 }
@@ -1313,14 +1308,6 @@ async function syncAndParseConfigs() {
       session_id: sessionId, configs_text: text, output_format: 'plain'
     });
   } catch(e) { /* parse errors are shown in log */ }
-}
-
-function syncConfigEditors() {
-  const src = document.getElementById('spinEditor').value;
-  const dst = document.getElementById('energyEditor');
-  if (!dst.value || dst.value.trim().startsWith('#')) {
-    dst.value = src;
-  }
 }
 
 // ── Page 3 actions ──
@@ -1494,8 +1481,7 @@ function importConfigs() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      document.getElementById('spinEditor').value = ev.target.result;
-      document.getElementById('energyEditor').value = ev.target.result;
+      setConfigsText(ev.target.result);
       confCount = (ev.target.result.match(/^[^#\s]/gm) || []).length;
       updateStatus();
       log('Config loaded: ' + file.name);
@@ -1543,9 +1529,8 @@ function mapConfigs() {
 function sendImportToApp() {
   const mapped = document.getElementById('importOutput').value;
   if (mapped.trim()) {
-    document.getElementById('spinEditor').value += '\n\n# From imported model\n' + mapped + '\n' + '# '.repeat(20) + '\n\n';
+    setConfigsText(document.getElementById('spinEditor').value + '\n\n# From imported model\n' + mapped + '\n' + '# '.repeat(20) + '\n\n');
     log('Configurations imported into main application.');
-    syncConfigEditors();
   }
   closeImportModal();
 }
@@ -1569,8 +1554,18 @@ function showAbout() {
   alert('Visualbond 0.2 — 2024\nspectrojotometer web interface\n\nA tool to determine coupling constants\nin Heisenberg-like magnetic models\nfrom ab initio simulations.\n\nIFLP-CONICET / UNLP');
 }
 
-// ── Auto-sync between tabs ────────────────────────────────────────────────────
-// Debounce: wait 800ms after the user stops typing before hitting the API
+// ── Tab sync — mirrors the Tkinter behaviour ──────────────────────────────────
+//
+// The two config editors (tab 2 = spinEditor, tab 3 = energyEditor) share the
+// same underlying data.  The rule, same as in the Tkinter app, is:
+//
+//   • Leaving a tab  → save its content into the shared `configsText` state.
+//   • Entering a tab → load `configsText` into its editor, then recalculate.
+//
+// This means edits in either tab are always preserved and reflected in the other.
+
+let configsText = '';   // shared state, mirrors what Tkinter keeps in the model
+
 function debounce(fn, ms) {
   let timer;
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
@@ -1579,34 +1574,90 @@ function debounce(fn, ms) {
 const debouncedRecalc  = debounce(recalcEquations,  800);
 const debouncedRecalc2 = debounce(recalcEquations2, 800);
 
-document.addEventListener('DOMContentLoaded', () => {
-  const spinEditor   = document.getElementById('spinEditor');
-  const energyEditor = document.getElementById('energyEditor');
+// Called by switchTab() — runs BEFORE the tab visually changes.
+function onLeaveTab(previousTabId) {
+  if (previousTabId === 'tab2') {
+    configsText = document.getElementById('spinEditor').value;
+  } else if (previousTabId === 'tab3') {
+    configsText = document.getElementById('energyEditor').value;
+  }
+}
 
-  // Tab 2 editor: mirror to tab 3 + recalculate equations
-  spinEditor.addEventListener('input', () => {
-    if (!energyEditor.dataset.diverged) {
-      energyEditor.value = spinEditor.value;
+// Called by switchTab() — runs AFTER the tab visually changes.
+function onEnterTab(newTabId) {
+  if (newTabId === 'tab2') {
+    document.getElementById('spinEditor').value = configsText;
+    if (sessionId) debouncedRecalc();
+  } else if (newTabId === 'tab3') {
+    document.getElementById('energyEditor').value = configsText;
+    if (sessionId) debouncedRecalc2();
+  }
+}
+
+// Patch switchTab to call the hooks.
+// switchTab is now async: leaving tab1 validates the CIF first.
+const _switchTabOrig = switchTab;
+switchTab = async function(n) {
+  const prev = document.querySelector('.tab.active');
+  const prevId = prev ? prev.id : null;
+
+  // Leaving tab 1: validate the CIF editor content before allowing the switch
+  if (prevId === 'tab1') {
+    const cif_text = document.getElementById('modelEditor').value.trim();
+    if (!cif_text) {
+      log('Cannot switch tab: model editor is empty.', 'err');
+      return;
     }
+    if (!sessionId) {
+      log('Cannot switch tab: no session. Load a .cif file first.', 'err');
+      return;
+    }
+    // Show inline validation state in the status bar
+    document.getElementById('slModelTxt').textContent = 'Validating…';
+    try {
+      const data = await api('POST', `/model/${sessionId}/validate`, { cif_text });
+      // Update status with fresh model info
+      bondsCount = data.bonds.length;
+      document.getElementById('slModelTxt').textContent =
+        'Model OK — ' + data.num_atoms + ' atoms, ' + data.cell_size + ' sites';
+      document.getElementById('slBondsTxt').textContent =
+        bondsCount > 0 ? bondsCount + ' bond type(s)' : 'No bonds';
+      document.getElementById('slModel').classList.add('ok');
+      log('Model validated. atoms=' + data.num_atoms
+          + '  cell_size=' + data.cell_size
+          + '  bonds=' + bondsCount);
+    } catch(e) {
+      // api() already logged the error; keep user on tab 1
+      document.getElementById('slModelTxt').textContent = 'Invalid model';
+      document.getElementById('slModel').classList.remove('ok');
+      document.getElementById('slModel').classList.add('err');
+      return;   // ← block the tab switch
+    }
+  }
+
+  onLeaveTab(prevId);
+  _switchTabOrig(n);
+  onEnterTab('tab' + n);
+};
+
+// Helper used by optimizeConfigs, sendImportToApp, importConfigs, etc.
+// to update shared state and refresh both editors at once.
+function setConfigsText(text) {
+  configsText = text;
+  document.getElementById('spinEditor').value   = text;
+  document.getElementById('energyEditor').value = text;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Typing in either editor updates the shared state and recalculates.
+  document.getElementById('spinEditor').addEventListener('input', () => {
+    configsText = document.getElementById('spinEditor').value;
     debouncedRecalc();
   });
 
-  // Tab 3 editor: recalculate equations; mark as diverged once user
-  // replaces 'nan' with real energies so tab 2 edits no longer overwrite it
-  energyEditor.addEventListener('input', () => {
-    const hasRealEnergy = energyEditor.value
-      .split('\n')
-      .some(l => { const t = l.trim(); return t && !t.startsWith('#') && !t.startsWith('nan'); });
-    if (hasRealEnergy) energyEditor.dataset.diverged = '1';
+  document.getElementById('energyEditor').addEventListener('input', () => {
+    configsText = document.getElementById('energyEditor').value;
     debouncedRecalc2();
-  });
-
-  // Switching tabs: refresh equations panel immediately
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      if (tab.id === 'tab3' && sessionId) debouncedRecalc2();
-      if (tab.id === 'tab2' && sessionId) debouncedRecalc();
-    });
   });
 
   // Re-render chi chart on resize so the SVG fills the panel

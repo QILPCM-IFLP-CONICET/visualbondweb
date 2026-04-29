@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "visualbondweb"
+version = "0.2.0"
+description = "Web interface for the spectrojotometer magnetic-model tool"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+    "numpy>=1.24",
+    # ruamel.yaml is a transitive dep of pymatgen that pip sometimes misses
+    "ruamel.yaml>=0.17.0",
+    "spectrojotometer @ git+https://github.com/QILPCM-IFLP-CONICET/spectrojotometer",
+]
+
+[project.scripts]
+visualbondweb = "visualbondweb.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["visualbondweb*"]
+
+[tool.setuptools.package-data]
+visualbondweb = ["static/*", "static/**/*"]
