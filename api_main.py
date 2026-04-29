@@ -508,7 +508,7 @@ def evaluate_couplings(req: EvaluateRequest):
     js_vals = js[:-1]                     # remove E0
     jmax = float(np.max(np.abs(js_vals))) if len(js_vals) else 1.0
     fmt = req.output_format
-    incompatible = bool(np.any(np.array(jerr) < 0))
+    incompatible = bool(np.any(jerr < 0))
 
     # Build parameter list
     parameters = [{"name": "E0", "value": offset_energy, "error": None, "incompatible": False}]
