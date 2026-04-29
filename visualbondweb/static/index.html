@@ -1231,11 +1231,10 @@ async function addBonds() {
   const lx    = parseInt(document.getElementById('p1-lx').value) || 1;
   const ly    = parseInt(document.getElementById('p1-ly').value) || 1;
   const lz    = parseInt(document.getElementById('p1-lz').value) || 1;
-  const sc    = Math.max(lx, ly, lz);   // library uses a single scalar
-  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr + ' supercell_size=' + sc);
+  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr + ' supercell=[' + [lx,ly,lz] + ']');
   try {
     const data = await api('POST', '/model/add_bonds', {
-      session_id: sessionId, rmin, rmax, discretization: discr, supercell_size: sc
+      session_id: sessionId, rmin, rmax, discretization: discr, supercell_size: [lx, ly, lz]
     });
     document.getElementById('modelEditor').value = data.cif_text;
     document.getElementById('modelStat').textContent = data.cif_text.split('\n').length + ' lines';
