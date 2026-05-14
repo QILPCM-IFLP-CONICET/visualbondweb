@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualbond — Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0f1117;
+    --bg2:       #161b27;
+    --bg3:       #1d2436;
+    --border:    #2a3350;
+    --border2:   #3a4a6a;
+    --accent:    #4a9eff;
+    --accent2:   #7ec8e3;
+    --green:     #3ecf8e;
+    --amber:     #f6a623;
+    --red:       #ff5a5a;
+    --text:      #e2e8f0;
+    --text2:     #8a9bb5;
+    --text3:     #556070;
+    --mono:      'IBM Plex Mono', monospace;
+    --sans:      'IBM Plex Sans', sans-serif;
+    --radius:    6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .shell {
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar nav ── */
+  .sidenav {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidenav-header {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .sidenav-header .brand {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text);
+  }
+  .sidenav-header .version {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .hex-badge {
+    width: 30px; height: 30px;
+    background: rgba(74,158,255,0.15);
+    border: 1px solid rgba(74,158,255,0.3);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .nav-section {
+    padding: 10px 0 4px;
+  }
+  .nav-section-label {
+    padding: 4px 16px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 12.5px;
+    transition: color .12s, background .12s;
+    border-left: 2px solid transparent;
+  }
+  .nav-link:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.03);
+  }
+  .nav-link.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(74,158,255,0.06);
+  }
+  .nav-link .nav-icon {
+    font-size: 11px;
+    opacity: 0.7;
+    width: 14px;
+    text-align: center;
+  }
+  .nav-sub {
+    padding-left: 38px;
+    font-size: 11.5px;
+    color: var(--text3);
+  }
+  .nav-sub:hover { color: var(--text2); }
+
+  /* ── Main content ── */
+  .content {
+    flex: 1;
+    max-width: 820px;
+    padding: 48px 56px;
+    min-width: 0;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 56px 10px 16px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+  }
+  .topbar-version {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    background: rgba(62,207,142,0.1);
+    border: 1px solid rgba(62,207,142,0.25);
+    border-radius: 4px;
+    color: var(--green);
+  }
+
+  /* ── Sections ── */
+  section {
+    padding: 0;
+    margin-bottom: 56px;
+    scroll-margin-top: 48px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin-bottom: 12px;
+    line-height: 1.25;
+  }
+  h1 .accent { color: var(--accent); }
+
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 16px;
+    margin-top: 40px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .h2-icon {
+    font-size: 14px;
+    opacity: 0.7;
+  }
+  h2 .h2-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+
+  h3 {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--accent2);
+    margin-bottom: 8px;
+    margin-top: 24px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+
+  p {
+    color: var(--text2);
+    margin-bottom: 14px;
+    font-size: 13.5px;
+    line-height: 1.75;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* lead paragraph */
+  .lead {
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.65;
+    margin-bottom: 24px;
+    font-weight: 300;
+  }
+
+  /* ── Workflow diagram ── */
+  .workflow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 28px 0;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .wf-step {
+    flex: 1;
+    padding: 16px 14px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+  .wf-step:last-child { border-right: none; }
+  .wf-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    display: block;
+    margin-bottom: 4px;
+    letter-spacing: 0.1em;
+  }
+  .wf-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    display: block;
+  }
+  .wf-sub {
+    font-size: 10px;
+    color: var(--text3);
+    display: block;
+    margin-top: 3px;
+  }
+  .wf-step.tab1 { background: rgba(74,158,255,0.05); }
+  .wf-step.tab2 { background: rgba(62,207,142,0.05); }
+  .wf-step.tab3 { background: rgba(246,166,35,0.05); }
+  .wf-arrow {
+    font-size: 16px;
+    color: var(--border2);
+    padding: 0 0;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Parameter / field table ── */
+  .field-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 12.5px;
+  }
+  .field-table th {
+    text-align: left;
+    padding: 7px 12px;
+    background: var(--bg3);
+    color: var(--text3);
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .field-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+  .field-table tr:last-child td { border-bottom: none; }
+  .field-table tr:hover td { background: rgba(255,255,255,0.015); }
+  .field-table .field-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+    white-space: nowrap;
+  }
+  .field-table .field-default {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    white-space: nowrap;
+  }
+  .field-table .field-desc { font-size: 12.5px; }
+
+  /* ── Code / monospace blocks ── */
+  pre, code {
+    font-family: var(--mono);
+  }
+  code {
+    font-size: 11.5px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--accent2);
+  }
+  pre {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-size: 11.5px;
+    color: var(--text2);
+    overflow-x: auto;
+    line-height: 1.65;
+    margin: 14px 0;
+  }
+  pre .cm  { color: var(--text3); }
+  pre .kw  { color: var(--accent); }
+  pre .val { color: var(--green); }
+  pre .str { color: var(--amber); }
+
+  /* ── Callout boxes ── */
+  .callout {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    margin: 18px 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text2);
+  }
+  .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .callout.info {
+    background: rgba(74,158,255,0.07);
+    border: 1px solid rgba(74,158,255,0.2);
+  }
+  .callout.warn {
+    background: rgba(246,166,35,0.07);
+    border: 1px solid rgba(246,166,35,0.2);
+  }
+  .callout.tip {
+    background: rgba(62,207,142,0.07);
+    border: 1px solid rgba(62,207,142,0.2);
+  }
+  .callout.danger {
+    background: rgba(255,90,90,0.07);
+    border: 1px solid rgba(255,90,90,0.2);
+  }
+  .callout strong { color: var(--text); }
+
+  /* ── Status badges ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+    letter-spacing: 0.03em;
+  }
+  .badge-green {
+    background: rgba(62,207,142,0.12);
+    border: 1px solid rgba(62,207,142,0.3);
+    color: var(--green);
+  }
+  .badge-amber {
+    background: rgba(246,166,35,0.12);
+    border: 1px solid rgba(246,166,35,0.3);
+    color: var(--amber);
+  }
+  .badge-red {
+    background: rgba(255,90,90,0.12);
+    border: 1px solid rgba(255,90,90,0.3);
+    color: var(--red);
+  }
+  .badge-blue {
+    background: rgba(74,158,255,0.12);
+    border: 1px solid rgba(74,158,255,0.3);
+    color: var(--accent);
+  }
+
+  /* ── Step list ── */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 18px 0;
+  }
+  .step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    background: rgba(74,158,255,0.15);
+    border: 1px solid rgba(74,158,255,0.3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .step-body {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.65;
+  }
+  .step-body strong { color: var(--text); }
+
+  /* ── Keyboard shortcuts ── */
+  kbd {
+    font-family: var(--mono);
+    font-size: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--text2);
+    white-space: nowrap;
+  }
+
+  /* ── Section dividers ── */
+  .section-anchor {
+    display: block;
+    height: 1px;
+    margin-bottom: -1px;
+  }
+
+  /* ── Hero intro block ── */
+  .hero {
+    padding: 32px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+  .hero-equation {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text3);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-top: 20px;
+    line-height: 1.8;
+  }
+  .hero-equation .eq-lhs { color: var(--accent); }
+  .hero-equation .eq-sum { color: var(--text2); }
+  .hero-equation .eq-j   { color: var(--green); }
+  .hero-equation .eq-s   { color: var(--amber); }
+
+  /* ── Spin config example ── */
+  .spin-example {
+    background: #070c0f;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.8;
+    margin: 14px 0;
+  }
+  .spin-example .sc { color: var(--text3); }
+  .spin-example .se { color: var(--green); }
+  .spin-example .sv { color: var(--amber); }
+  .spin-example .sn { color: var(--accent2); }
+  .spin-example .sl { color: var(--text3); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border2); }
+
+  /* ── Print / narrow ── */
+  @media (max-width: 860px) {
+    .sidenav { display: none; }
+    .content { padding: 24px 20px; }
+    .workflow { flex-direction: column; }
+    .wf-step { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ═══════ SIDEBAR ═══════ -->
+  <nav class="sidenav">
+    <div class="sidenav-header">
+      <div class="hex-badge">⬡</div>
+      <div>
+        <div class="brand">Visualbond</div>
+        <div class="version">docs · v0.2</div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Overview</div>
+      <a class="nav-link" href="#intro"><span class="nav-icon">◈</span> Introduction</a>
+      <a class="nav-link" href="#workflow"><span class="nav-icon">→</span> Workflow</a>
+      <a class="nav-link" href="#interface"><span class="nav-icon">⬡</span> Interface layout</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Tabs</div>
+      <a class="nav-link" href="#tab1"><span class="nav-icon">1</span> Define Model</a>
+      <a class="nav-link nav-sub" href="#tab1-load">Loading a file</a>
+      <a class="nav-link nav-sub" href="#tab1-bonds">Adding bonds</a>
+      <a class="nav-link nav-sub" href="#tab1-lattice">Growing the lattice</a>
+      <a class="nav-link nav-sub" href="#tab1-editor">CIF editor</a>
+      <a class="nav-link" href="#tab2"><span class="nav-icon">2</span> Spin Configurations</a>
+      <a class="nav-link nav-sub" href="#tab2-format">Spin config format</a>
+      <a class="nav-link nav-sub" href="#tab2-optimize">Optimizing configs</a>
+      <a class="nav-link nav-sub" href="#tab2-equations">Equations</a>
+      <a class="nav-link" href="#tab3"><span class="nav-icon">3</span> Set Energies &amp; Evaluate</a>
+      <a class="nav-link nav-sub" href="#tab3-dft">Entering DFT energies</a>
+      <a class="nav-link nav-sub" href="#tab3-errmethod">Error method</a>
+      <a class="nav-link nav-sub" href="#tab3-results">Reading results</a>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-label">Reference</div>
+      <a class="nav-link" href="#method"><span class="nav-icon">∑</span> The method</a>
+      <a class="nav-link nav-sub" href="#method-model">Linear model</a>
+      <a class="nav-link nav-sub" href="#method-optconf">Optimal configurations</a>
+      <a class="nav-link nav-sub" href="#method-errors">Error bounds</a>
+      <a class="nav-link" href="#files"><span class="nav-icon">⬗</span> File formats</a>
+      <a class="nav-link" href="#statusbar"><span class="nav-icon">≡</span> Status bar &amp; log</a>
+      <a class="nav-link" href="#shortcuts"><span class="nav-icon">⌨</span> Keyboard shortcuts</a>
+      <a class="nav-link" href="#errors"><span class="nav-icon">⚠</span> Errors &amp; warnings</a>
+      <a class="nav-link" href="#citation"><span class="nav-icon">◉</span> Citation</a>
+    </div>
+  </nav>
+
+  <!-- ═══════ MAIN ═══════ -->
+  <main>
+
+    <div class="topbar">
+      <span class="topbar-title">VISUALBOND / DOCUMENTATION</span>
+      <span class="topbar-version">spectrojotometer 0.2</span>
+    </div>
+
+    <div class="content">
+
+      <!-- ─── INTRO ─── -->
+      <section id="intro">
+        <div class="hero">
+          <div class="hero-tag">Visualbond — spectrojotometer web interface</div>
+          <h1>Determine magnetic coupling<br><span class="accent">constants from first principles</span></h1>
+          <p class="lead">
+            Visualbond is a web interface for the <strong>spectrojotometer</strong> library.
+            It implements the method of Matera <em>et al.</em>
+            (<em>Comput. Mater. Sci.</em> <strong>178</strong>, 109628, 2020)
+            for the <em>optimal</em> determination of exchange coupling constants <em>J<sub>i</sub></em>
+            in a Heisenberg spin Hamiltonian from ab initio (DFT) total energies computed for
+            selected spin configurations of your magnetic material.
+          </p>
+
+          <div class="hero-equation">
+            <span class="eq-lhs">H</span>
+            <span class="eq-sum"> = −</span>
+            <span class="eq-sum">Σ<sub>⟨i,j⟩</sub></span>
+            &nbsp;
+            <span class="eq-j">J<sub>ij</sub></span>
+            &nbsp;
+            <span class="eq-s">S<sub>i</sub> · S<sub>j</sub></span>
+            <br>
+            <span class="sc" style="font-size:10px;color:var(--text3)">
+              # J &gt; 0 → ferromagnetic &nbsp;|&nbsp; J &lt; 0 → antiferromagnetic
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── WORKFLOW ─── -->
+      <section id="workflow">
+        <h2><span class="h2-icon">→</span> Workflow overview</h2>
+        <p>The application is organized as a sequential three-step workflow. Each step corresponds
+        to one tab in the interface. Tabs 2 and 3 are unlocked automatically once a model is loaded
+        and validated.</p>
+
+        <div class="workflow">
+          <div class="wf-step tab1">
+            <span class="wf-num">TAB 1</span>
+            <span class="wf-label">Define Model</span>
+            <span class="wf-sub">Load .cif / .struct<br>set bonds &amp; supercell</span>
+          </div>
+          <div class="wf-step tab2">
+            <span class="wf-num">TAB 2</span>
+            <span class="wf-label">Spin Configurations</span>
+            <span class="wf-sub">Generate or import spin<br>configs, inspect equations</span>
+          </div>
+          <div class="wf-step tab3">
+            <span class="wf-num">TAB 3</span>
+            <span class="wf-label">Evaluate</span>
+            <span class="wf-sub">Enter DFT energies,<br>compute J<sub>i</sub></span>
+          </div>
+        </div>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body"><strong>Load your crystal structure.</strong> Upload a <code>.cif</code> or <code>.struct</code> file containing the magnetic atom positions.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body"><strong>Add bonds.</strong> Define the exchange interaction range by specifying minimum and maximum bond lengths (in Å). Visualbond identifies all symmetry-inequivalent bond types within that range.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body"><strong>Generate spin configurations.</strong> Use the optimizer to produce a set of spin configurations that, when used as DFT inputs, will give the best-conditioned linear system for extracting <em>J</em> values.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body"><strong>Run ab initio calculations.</strong> Take the generated spin configurations to your DFT code (VASP, Quantum ESPRESSO, etc.) and compute total energies for each.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">5</div>
+            <div class="step-body"><strong>Enter energies and evaluate.</strong> Paste the total energies back into Tab 3, then press <em>Estimate parameters</em> to obtain the coupling constants with error bounds.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── INTERFACE ─── -->
+      <section id="interface">
+        <h2><span class="h2-icon">⬡</span> Interface layout</h2>
+        <p>The Visualbond window is divided into four main regions:</p>
+
+        <table class="field-table">
+          <tr><th>Region</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">Top bar</td>
+            <td class="field-desc">Application title, <strong>File / Edit / Help</strong> menus, and a status pill showing the currently loaded file (green dot = model loaded).</td>
+          </tr>
+          <tr>
+            <td class="field-name">Tab bar</td>
+            <td class="field-desc">Three numbered tabs. Tabs 2 and 3 are greyed out until a valid model is loaded and the CIF passes validation on leaving Tab 1.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Main area</td>
+            <td class="field-desc">The active tab's content: sidebar with controls on the left, a central text editor, and (on Tabs 2–3) a results panel on the right.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Status / Log bar</td>
+            <td class="field-desc">A persistent terminal-style log at the bottom of the window. All operations append messages here in real time.</td>
+          </tr>
+        </table>
+      </section>
+
+      <!-- ─── TAB 1 ─── -->
+      <section id="tab1">
+        <h2><span class="h2-num">1</span> Tab 1 — Define Model</h2>
+        <p>This is where you load your crystal structure, set the interaction range, and generate bond types. No calculation is possible until a valid model is defined here.</p>
+
+        <h3 id="tab1-load">Loading a model file</h3>
+        <p>Visualbond accepts two file formats:</p>
+
+        <table class="field-table">
+          <tr><th>Format</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">.cif</td>
+            <td class="field-desc">Crystallographic Information File — the standard interchange format for crystal structures. Most databases (ICSD, COD, Materials Project) export this format.</td>
+          </tr>
+          <tr>
+            <td class="field-name">.struct</td>
+            <td class="field-desc">WIEN2k / spectrojotometer structure format.</td>
+          </tr>
+        </table>
+
+        <p>To load a file, use any of these methods:</p>
+        <ul style="color:var(--text2);font-size:13px;line-height:2;padding-left:20px;">
+          <li>Click the <strong>upload zone</strong> in the sidebar ("<em>Drop .cif / .struct here</em>") to open a file browser.</li>
+          <li>Use <strong>File → Open model file…</strong> from the menu bar.</li>
+          <li>Press <kbd>Ctrl+O</kbd>.</li>
+        </ul>
+
+        <p>On successful upload the CIF text of the parsed model is loaded into the editor, and the
+        status bar shows the atom count and cell size.</p>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <span>If you upload a <code>.struct</code> file, Visualbond converts it to CIF internally. The editor always shows the CIF representation.</span>
+        </div>
+
+        <h3 id="tab1-bonds">Adding bonds</h3>
+        <p>The <strong>Add bonds</strong> panel defines which pairs of magnetic sites are considered
+        exchange-coupled. Visualbond groups all symmetry-equivalent pairs within the distance range
+        into named bond types (e.g. <code>J1</code>, <code>J2</code>, …).</p>
+
+        <table class="field-table">
+          <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">rmin</td>
+            <td class="field-default">0.0 Å</td>
+            <td class="field-desc">Minimum bond length. Bonds shorter than this are ignored. Useful to exclude on-site self-interactions.</td>
+          </tr>
+          <tr>
+            <td class="field-name">rmax</td>
+            <td class="field-default">4.9 Å</td>
+            <td class="field-desc">Maximum bond length. All symmetry-inequivalent magnetic pairs within this distance are included. Increase to capture more distant neighbors; be aware that more bonds require more spin configurations.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Discretization</td>
+            <td class="field-default">0.02 Å</td>
+            <td class="field-desc">Resolution used to distinguish bond lengths. Two bonds closer than this value are treated as equivalent. Reduce for very dense structures.</td>
+          </tr>
+        </table>
+
+        <p>Press <strong>⬡ Add bonds</strong> to run the bond search. The CIF text in the editor
+        is updated with the new bond information, and the status bar shows the number of bond types
+        found.</p>
+
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <span><strong>No bonds defined?</strong> Tabs 2 and 3 will still be accessible, but the Optimize and Evaluate operations will refuse to run. Always add bonds before proceeding.</span>
+        </div>
+
+        <h3 id="tab1-lattice">Growing the lattice (supercell)</h3>
+        <p>The <strong>Grow lattice</strong> panel lets you expand the primitive cell into a supercell
+        before bond generation. This is necessary when the spin configurations you need span more
+        than one unit cell.</p>
+
+        <table class="field-table">
+          <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">Lx</td>
+            <td class="field-default">1</td>
+            <td class="field-desc">Repetitions along the <em>a</em> lattice vector.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Ly</td>
+            <td class="field-default">1</td>
+            <td class="field-desc">Repetitions along the <em>b</em> lattice vector.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Lz</td>
+            <td class="field-default">1</td>
+            <td class="field-desc">Repetitions along the <em>c</em> lattice vector.</td>
+          </tr>
+        </table>
+
+        <p>Press <strong>↗ Apply &amp; grow</strong> (or equivalently <strong>Add bonds</strong>
+        with the supercell values set) to regenerate bonds on the expanded cell.</p>
+
+        <div class="callout tip">
+          <span class="callout-icon">✦</span>
+          <span><strong>Tip:</strong> A 2×2×1 supercell doubles the number of independent sites and therefore allows more complex (longer-wavelength) spin patterns. Start with 1×1×1 and only enlarge if the optimizer reports a poor condition number.</span>
+        </div>
+
+        <h3 id="tab1-editor">CIF editor</h3>
+        <p>The central panel is a plain-text editor showing the current CIF content. You can edit
+        it directly — for example to manually correct site labels, adjust occupancies, or add
+        custom bond entries. Changes are validated automatically when you leave Tab 1.</p>
+
+        <p>The toolbar at the bottom offers:</p>
+        <ul style="color:var(--text2);font-size:13px;line-height:2;padding-left:20px;">
+          <li><strong>Open .cif</strong> — open a new file (same as the upload zone).</li>
+          <li><strong>Save</strong> — download the current CIF as <code>model.cif</code>.</li>
+          <li>A line count indicator on the right.</li>
+        </ul>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <span>When you navigate to Tab 2 or Tab 3, Visualbond silently validates the CIF content. If the file cannot be parsed, the tab switch is blocked and an error is shown in the log.</span>
+        </div>
+      </section>
+
+      <!-- ─── TAB 2 ─── -->
+      <section id="tab2">
+        <h2><span class="h2-num">2</span> Tab 2 — Spin Configurations &amp; Couplings</h2>
+        <p>Here you build and inspect the set of spin configurations that will be used as DFT
+        inputs. The goal is a set of configurations that gives a well-conditioned linear system
+        for extracting the <em>J</em> values.</p>
+
+        <h3 id="tab2-format">Spin configuration file format (.spin)</h3>
+        <p>Configurations are stored in a plain-text format. Each non-comment line represents one
+        spin configuration:</p>
+
+        <div class="spin-example">
+<span class="sc"># Spin configurations definition file</span>
+<span class="sc"># Energy        [config]          # label</span>
+
+<span class="se">nan</span>  <span class="sv">[0,1,0,1,0,1,0]</span>  <span class="sl"># Antiferro_1</span>
+<span class="se">nan</span>  <span class="sv">[1,0,1,0,1,0,1]</span>  <span class="sl"># Antiferro_2</span>
+<span class="se">nan</span>  <span class="sv">[0,0,0,0,0,0,0]</span>  <span class="sl"># Ferro_up</span>
+<span class="se">nan</span>  <span class="sv">[1,1,1,1,1,1,1]</span>  <span class="sl"># Ferro_down</span>
+        </div>
+
+        <table class="field-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">Energy</td>
+            <td class="field-desc">Total energy from DFT (in the units your code uses, e.g. eV). Use <code>nan</code> when the energy is not yet known (Tab 2 stage) — these entries are used to build equations but excluded from the fit.</td>
+          </tr>
+          <tr>
+            <td class="field-name">[config]</td>
+            <td class="field-desc">A list of <code>0</code>s and <code>1</code>s, one per magnetic site in the cell. <code>0</code> = spin up, <code>1</code> = spin down.</td>
+          </tr>
+          <tr>
+            <td class="field-name"># label</td>
+            <td class="field-desc">Optional comment used to identify the configuration in plots and output. If omitted, a numeric index is generated automatically.</td>
+          </tr>
+        </table>
+
+        <h3 id="tab2-optimize">Optimizing configurations</h3>
+        <p>The <strong>Optimize</strong> panel generates a set of spin configurations that minimizes
+        the condition number of the linear system <em>A·J = E</em>. A smaller condition number
+        means more reliable <em>J</em> estimates.</p>
+
+        <table class="field-table">
+          <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">Num. configs</td>
+            <td class="field-default">10</td>
+            <td class="field-desc">Number of new configurations to generate and append to the editor. You need at least <em>N<sub>bonds</sub> + 1</em> configurations with known energies to determine all coupling constants.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Bunch size</td>
+            <td class="field-default">10</td>
+            <td class="field-desc">Internal parameter: the size of the candidate pool evaluated at each optimization step. Larger values improve quality at the cost of speed.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Iterations</td>
+            <td class="field-default">100</td>
+            <td class="field-desc">Number of optimization iterations. More iterations yield a better condition number but take longer.</td>
+          </tr>
+        </table>
+
+        <p>After pressing <strong>⬟ Optimize</strong>, new lines are appended to the configuration
+        editor with energies set to <code>nan</code> and a comment showing the condition number
+        estimate.</p>
+
+        <p><strong>◈ Optimal independent set</strong> — finds the smallest subset of the current
+        configurations that spans the full coupling-constant space. Useful for reducing the number
+        of DFT calculations needed.</p>
+
+        <h3 id="tab2-equations">Equations panel</h3>
+        <p>The right-hand panel shows the linear equations that relate total energies to coupling
+        constants, derived from the current set of configurations. The output format can be
+        switched between:</p>
+
+        <table class="field-table">
+          <tr><th>Format</th><th>Description</th></tr>
+          <tr><td class="field-name">Plain</td><td class="field-desc">Human-readable ASCII. Good for a quick check.</td></tr>
+          <tr><td class="field-name">LaTeX</td><td class="field-desc">Ready to paste into a paper or thesis.</td></tr>
+          <tr><td class="field-name">Wolfram</td><td class="field-desc">Wolfram Language syntax for use in Mathematica / Wolfram Alpha.</td></tr>
+        </table>
+
+        <p>The equations panel updates automatically as you type in the configuration editor
+        (with a short debounce delay). Press <strong>↺ Recalculate</strong> to force an immediate
+        update.</p>
+
+        <div class="callout tip">
+          <span class="callout-icon">✦</span>
+          <span><strong>Importing from another model:</strong> Use <strong>↗ Load configs from other model</strong> to map configurations computed for a different (but related) structure onto the current model. A site-mapping string and length tolerance allow you to reuse existing DFT data.</span>
+        </div>
+      </section>
+
+      <!-- ─── TAB 3 ─── -->
+      <section id="tab3">
+        <h2><span class="h2-num">3</span> Tab 3 — Set Energies &amp; Evaluate</h2>
+        <p>Once you have computed DFT total energies for your spin configurations, come here to
+        enter them and extract the coupling constants.</p>
+
+        <h3 id="tab3-dft">Entering DFT energies</h3>
+        <p>The central editor in Tab 3 shares the same format as Tab 2. Open your <code>.spin</code>
+        file (or switch from Tab 2 — the content is kept in sync) and replace each <code>nan</code>
+        with the corresponding total energy from your DFT code.</p>
+
+        <div class="spin-example">
+<span class="sc"># Spin configurations with DFT energies (eV)</span>
+
+<span class="se">-143121.12</span>  <span class="sv">[0,0,0,0,0,0,0]</span>  <span class="sl"># Ferro_up</span>
+<span class="se">-143121.02</span>  <span class="sv">[1,1,0,0,1,1,1]</span>  <span class="sl"># Disorder_1</span>
+<span class="se">-143121.24</span>  <span class="sv">[1,0,1,1,1,1,0]</span>  <span class="sl"># Disorder_2</span>
+<span class="se">nan</span>           <span class="sv">[0,1,0,1,0,1,0]</span>  <span class="sl"># (no energy yet)</span>
+        </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <span>Lines with <code>nan</code> are included in the equation display but <strong>excluded from the fit</strong>. You can keep them in the file as a reference.</span>
+        </div>
+
+        <p>You need at least <em>N<sub>bonds</sub> + 1</em> lines with numerical energies. If you
+        have fewer, <em>Estimate parameters</em> will report an error and tell you how many more
+        are needed.</p>
+
+        <h3 id="tab3-errmethod">Error bound method</h3>
+        <p>Visualbond can estimate error bounds on the <em>J</em> values using two methods:</p>
+
+        <table class="field-table">
+          <tr><th>Method</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">Quadratic bound</td>
+            <td class="field-desc">An analytic upper bound derived from the energy tolerance and the condition number. Fast but conservative (overestimates errors).</td>
+          </tr>
+          <tr>
+            <td class="field-name">Monte Carlo</td>
+            <td class="field-desc">Samples random perturbations of the input energies within the specified tolerance and estimates the standard deviation of <em>J</em>. More accurate than the quadratic bound. Recommended for final results.</td>
+          </tr>
+        </table>
+
+        <table class="field-table">
+          <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">Energy tol.</td>
+            <td class="field-default">0.001</td>
+            <td class="field-desc">Assumed uncertainty on each DFT energy (in the same units as the energies). This corresponds to your DFT convergence threshold.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Num. samples</td>
+            <td class="field-default">1000</td>
+            <td class="field-desc">(Monte Carlo only) Number of random perturbation samples. 1000 is adequate for most purposes; increase to 5000–10000 for publication-quality uncertainties.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Size factor</td>
+            <td class="field-default">1.0</td>
+            <td class="field-desc">(Monte Carlo only) Scales the amplitude of random perturbations relative to the energy tolerance. Keep at 1.0 unless you have a specific reason to change it.</td>
+          </tr>
+        </table>
+
+        <h3 id="tab3-results">Reading the results</h3>
+        <p>After pressing <strong>⬗ Estimate parameters</strong>, three result panels are populated:</p>
+
+        <h3>Equations panel</h3>
+        <p>Shows the system of linear equations using only configurations with known energies.</p>
+
+        <h3>Determined parameters</h3>
+        <p>Each coupling constant appears as a card. The cards show:</p>
+        <ul style="color:var(--text2);font-size:13px;line-height:2.2;padding-left:20px;">
+          <li><strong>Name</strong> — the bond label (e.g. <code>J1</code>) or <code>E0</code> for the energy offset.</li>
+          <li><strong>Value</strong> — the best-fit coupling constant, in the same energy units as the input energies divided by the number of spins in the cell.</li>
+          <li><strong>Normalized value</strong> — the value divided by <em>J<sub>max</sub></em>, the largest |<em>J</em>| found.</li>
+          <li><strong>Error</strong> — the estimated uncertainty (±). A <strong>negative</strong> error means the system is incompatible (see below).</li>
+        </ul>
+
+        <p>Card color codes:</p>
+        <p>
+          <span class="badge badge-blue">Normal</span> &nbsp;
+          Normal result. &nbsp;&nbsp;
+          <span class="badge badge-amber">⚠</span> &nbsp;
+          Parameter is small relative to the error bound. &nbsp;&nbsp;
+          <span class="badge badge-red">⚠ incompatible</span> &nbsp;
+          The system is over-determined in a contradictory way (see Errors section).
+        </p>
+
+        <h3>Energy errors chart</h3>
+        <p>A bar chart showing the normalized residuals <em>ΔE<sub>i</sub>/ΔE</em> for each
+        configuration used in the fit. These should all lie <strong>within ±1</strong> (shown
+        by amber dashed lines) for a compatible model.</p>
+
+        <p>Bar colors indicate:</p>
+        <p>
+          <span class="badge badge-green">● ≤ 0.7</span> &nbsp; Well within bounds. &nbsp;
+          <span class="badge badge-amber">● ≤ 1.0</span> &nbsp; Near the bound. &nbsp;
+          <span class="badge badge-red">● &gt; 1.0</span> &nbsp; Outside bounds — model may be incompatible.
+        </p>
+      </section>
+
+      <!-- ─── METHOD ─── -->
+      <section id="method">
+        <h2><span class="h2-icon">∑</span> The method</h2>
+        <p>This section gives a self-contained description of the algorithm implemented in
+        spectrojotometer and exposed through Visualbond. For the full derivation and benchmarks
+        see the original publication: <a href="https://doi.org/10.1016/j.commatsci.2020.109628" target="_blank">doi:10.1016/j.commatsci.2020.109628</a>.</p>
+
+        <h3 id="method-model">The linear model</h3>
+        <p>The total energy of a magnetic insulator in a collinear spin configuration
+        <strong>σ</strong> = (σ<sub>1</sub>, …, σ<sub>N</sub>) ∈ {0,1}<sup>N</sup> is
+        modelled by a classical Ising/Heisenberg Hamiltonian mapped to the form:</p>
+
+        <div class="hero-equation">
+          <span class="eq-lhs">E(<strong>σ</strong>)</span>
+          <span class="eq-sum"> = E<sub>0</sub> + </span>
+          <span class="eq-sum">Σ<sub>k</sub></span>
+          &nbsp;
+          <span class="eq-j">J<sub>k</sub></span>
+          &nbsp;
+          <span class="eq-s">A<sub>k</sub>(<strong>σ</strong>)</span>
+          <br>
+          <span style="font-size:10px;color:var(--text3)">
+            # A<sub>k</sub>(<strong>σ</strong>) = number of unlike-spin pairs of bond type k in configuration σ
+          </span>
+        </div>
+
+        <p>Here <em>k</em> runs over the symmetry-inequivalent bond types found in the crystal
+        (e.g. first neighbors J<sub>1</sub>, second neighbors J<sub>2</sub>, …), and
+        A<sub>k</sub>(<strong>σ</strong>) counts the number of antiparallel spin pairs of that
+        type in configuration <strong>σ</strong>. E<sub>0</sub> is an overall energy offset
+        (the ferromagnetic reference energy).</p>
+
+        <p>Computing the total energy for <em>M</em> different configurations gives a linear
+        system:</p>
+
+        <div class="hero-equation">
+          <span class="eq-lhs"><strong>A</strong> · <strong>J</strong></span>
+          <span class="eq-sum"> = </span>
+          <span class="eq-s"><strong>E</strong></span>
+          <br>
+          <span style="font-size:10px;color:var(--text3)">
+            # A ∈ ℝ<sup>M×(K+1)</sup>, J = (J<sub>1</sub>,…,J<sub>K</sub>, E<sub>0</sub>)<sup>T</sup>, E ∈ ℝ<sup>M</sup>
+          </span>
+        </div>
+
+        <p>This system is solved in the least-squares sense when <em>M > K+1</em>. The quality
+        of the determination depends critically on the <strong>condition number</strong>
+        κ(<strong>A</strong>): a large condition number amplifies energy errors into large
+        uncertainties on <strong>J</strong>.</p>
+
+        <h3 id="method-optconf">Optimal configurations</h3>
+        <p>The key contribution of the paper is an algorithm to find the set of spin
+        configurations <strong>σ</strong><sup>(1)</sup>, …, <strong>σ</strong><sup>(M)</sup>
+        that <em>minimizes</em> the condition number κ(<strong>A</strong>), thereby requiring
+        the fewest DFT calculations for a given target accuracy.</p>
+
+        <p>The algorithm is iterative:</p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Start from any initial set of configurations (or an empty set).</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">At each iteration, generate a <em>bunch</em> of candidate configurations at random and evaluate κ for each candidate added to the current set.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">Keep the candidate that most reduces κ and add it to the set.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">Repeat until the desired number of configurations is reached.</div>
+          </div>
+        </div>
+
+        <p>This greedy strategy is efficient and produces near-optimal configuration sets in
+        practice. The condition number reported after optimization is an upper bound on
+        |ΔJ| / |ΔE|: the relative error in the coupling constants is at most κ times the
+        relative error in the DFT energies.</p>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <span>The <strong>Optimal independent set</strong> button finds the smallest subset of configurations that achieves the same (or similar) condition number — useful when you already have more configurations than strictly necessary and want to minimize DFT runs.</span>
+        </div>
+
+        <h3 id="method-errors">Error bounds on coupling constants</h3>
+        <p>Given DFT energies with uncertainty δE, spectrojotometer provides two kinds of
+        error bounds on the extracted <em>J</em> values:</p>
+
+        <table class="field-table">
+          <tr><th>Method</th><th>Description</th></tr>
+          <tr>
+            <td class="field-name">Quadratic bound</td>
+            <td class="field-desc">
+              An analytic bound derived from the pseudo-inverse of <strong>A</strong>:
+              <br><br>
+              <code style="font-size:11px">δJ ≤ ‖A<sup>+</sup>‖ · δE</code>
+              <br><br>
+              Fast to compute and always valid, but typically conservative (overestimates the
+              actual uncertainty). The displayed error is an upper bound, not a standard deviation.
+            </td>
+          </tr>
+          <tr>
+            <td class="field-name">Monte Carlo</td>
+            <td class="field-desc">
+              Samples <em>N</em> random perturbation vectors δ<strong>E</strong> drawn
+              uniformly from [−δE, +δE]<sup>M</sup> and solves the perturbed system each time.
+              The reported error is the standard deviation of the resulting distribution of
+              <em>J</em> values — a more realistic estimate of the actual uncertainty.
+              Recommended for final published results.
+            </td>
+          </tr>
+        </table>
+
+        <p>A parameter set is flagged as <strong>incompatible</strong> when the quadratic bound
+        yields a negative value for one or more <em>J<sub>k</sub></em> — this indicates that
+        the interval [J<sub>k</sub> − δJ<sub>k</sub>, J<sub>k</sub> + δJ<sub>k</sub>] does not
+        include a self-consistent solution, i.e. the data cannot be explained by the chosen model
+        within the stated energy tolerance.</p>
+      </section>
+
+      <!-- ─── CITATION ─── -->
+      <section id="citation">
+        <h2><span class="h2-icon">◉</span> Citation</h2>
+        <p>If you use Visualbond or spectrojotometer in your research, please cite:</p>
+
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin:16px 0;">
+          <p style="color:var(--text);font-size:13px;line-height:1.8;margin-bottom:12px">
+            J.M. Matera, L.A. Errico, A.V. Gil Rebaza, V.I. Fernandez, C.A. Lamas<br>
+            <strong>Optimizing configurations for determining the magnetic model based on ab initio calculations</strong><br>
+            <em>Computational Materials Science</em> <strong>178</strong>, 109628 (2020)
+          </p>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">
+            DOI: <a href="https://doi.org/10.1016/j.commatsci.2020.109628" target="_blank" style="color:var(--accent)">10.1016/j.commatsci.2020.109628</a>
+          </div>
+        </div>
+
+        <p>BibTeX entry:</p>
+        <pre><span class="cm">@article</span>{Matera2020,
+  <span class="kw">author</span>  = {Matera, J.M. and Errico, L.A. and Gil Rebaza, A.V.
+             and Fernandez, V.I. and Lamas, C.A.},
+  <span class="kw">title</span>   = {<span class="str">Optimizing configurations for determining the magnetic
+             model based on ab initio calculations</span>},
+  <span class="kw">journal</span> = {<span class="str">Computational Materials Science</span>},
+  <span class="kw">volume</span>  = {<span class="val">178</span>},
+  <span class="kw">pages</span>   = {<span class="val">109628</span>},
+  <span class="kw">year</span>    = {<span class="val">2020</span>},
+  <span class="kw">doi</span>     = {<span class="str">10.1016/j.commatsci.2020.109628</span>},
+}</pre>
+
+        <div class="callout tip">
+          <span class="callout-icon">✦</span>
+          <span>The spectrojotometer library is freely available. Visualbond is developed at
+          <strong>IFLP-CONICET / UNLP</strong>, La Plata, Argentina.</span>
+        </div>
+      </section>
+
+      <!-- ─── FILES ─── -->
+      <section id="files">
+        <h2><span class="h2-icon">⬗</span> File formats reference</h2>
+
+        <h3>Model files</h3>
+        <table class="field-table">
+          <tr><th>Extension</th><th>Description</th></tr>
+          <tr><td class="field-name">.cif</td><td class="field-desc">Crystallographic Information File. Standard crystal structure format accepted by Visualbond as input and produced as output.</td></tr>
+          <tr><td class="field-name">.struct</td><td class="field-desc">WIEN2k structure file. Accepted on upload; converted internally to CIF.</td></tr>
+        </table>
+
+        <h3>Configuration files (.spin)</h3>
+        <p>Plain text, one configuration per line:</p>
+        <pre><span class="cm"># Lines starting with # are comments</span>
+<span class="cm"># Format: &lt;energy&gt;  [s0,s1,...,sN]  # optional_label</span>
+
+<span class="val">-143121.12</span>  <span class="str">[0,1,0,1,0,1,0]</span>  <span class="cm"># AFM_1</span>
+<span class="kw">nan</span>          <span class="str">[0,0,0,0,0,0,0]</span>  <span class="cm"># FM_up (no energy yet)</span></pre>
+
+        <ul style="color:var(--text2);font-size:13px;line-height:2;padding-left:20px;">
+          <li>Energies must be floating-point numbers or <code>nan</code>.</li>
+          <li>Config arrays must contain exactly as many entries as the cell size reported on model load.</li>
+          <li><code>0</code> = spin up, <code>1</code> = spin down.</li>
+          <li>Labels after <code>#</code> are optional but strongly recommended for traceability.</li>
+        </ul>
+
+        <h3>Saving and loading files</h3>
+        <table class="field-table">
+          <tr><th>Action</th><th>How</th></tr>
+          <tr><td class="field-name">Save model</td><td class="field-desc"><strong>File → Save model as…</strong> or the <em>Save</em> button in the Tab 1 toolbar. Downloads <code>model.cif</code>.</td></tr>
+          <tr><td class="field-name">Save configurations</td><td class="field-desc"><strong>File → Save configurations as…</strong> or the <em>Save</em> button in Tabs 2/3. Downloads <code>configurations.spin</code>.</td></tr>
+          <tr><td class="field-name">Open config file</td><td class="field-desc"><strong>File → Open config file…</strong> or the <em>Open .spin</em> button in Tabs 2/3.</td></tr>
+        </table>
+      </section>
+
+      <!-- ─── STATUS BAR ─── -->
+      <section id="statusbar">
+        <h2><span class="h2-icon">≡</span> Status bar &amp; log</h2>
+        <p>The bottom area of the window contains two zones:</p>
+
+        <h3>Log area (green text)</h3>
+        <p>All operations (file loads, bond generation, optimization, errors) are logged here in
+        real time. Log levels:</p>
+
+        <table class="field-table">
+          <tr><th>Style</th><th>Meaning</th></tr>
+          <tr><td><span style="color:var(--green);font-family:var(--mono);font-size:12px">green text</span></td><td class="field-desc">Normal informational messages.</td></tr>
+          <tr><td><span style="color:var(--red);font-family:var(--mono);font-size:12px">red text</span></td><td class="field-desc">Errors — an operation failed.</td></tr>
+          <tr><td><span style="color:var(--amber);font-family:var(--mono);font-size:12px">amber text</span></td><td class="field-desc">Warnings — the operation succeeded but something needs attention.</td></tr>
+          <tr><td><span style="color:var(--text3);font-family:var(--mono);font-size:12px">grey text</span></td><td class="field-desc">Informational metadata (startup messages, etc.).</td></tr>
+        </table>
+
+        <p>Use <strong>Edit → Clear log</strong> to clear the log area.</p>
+
+        <h3>Status line (bottom strip)</h3>
+        <p>Three indicator pills show the current state at a glance:</p>
+
+        <table class="field-table">
+          <tr><th>Pill</th><th>States</th></tr>
+          <tr><td class="field-name">Model</td><td class="field-desc"><span class="badge badge-green">● model OK</span> when a valid model is loaded; grey dot otherwise.</td></tr>
+          <tr><td class="field-name">Bonds</td><td class="field-desc">Shows the number of bond types found, or <em>No bonds</em>.</td></tr>
+          <tr><td class="field-name">Configurations</td><td class="field-desc">Count of the configurations currently in the editor.</td></tr>
+        </table>
+      </section>
+
+      <!-- ─── SHORTCUTS ─── -->
+      <section id="shortcuts">
+        <h2><span class="h2-icon">⌨</span> Keyboard shortcuts</h2>
+
+        <table class="field-table">
+          <tr><th>Shortcut</th><th>Action</th></tr>
+          <tr><td><kbd>Ctrl+O</kbd></td><td class="field-desc">Open model file</td></tr>
+          <tr><td><kbd>Ctrl+Z</kbd></td><td class="field-desc">Undo (in editors)</td></tr>
+          <tr><td><kbd>Ctrl+Y</kbd></td><td class="field-desc">Redo (in editors)</td></tr>
+          <tr><td><kbd>Ctrl+X</kbd> / <kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd></td><td class="field-desc">Cut / Copy / Paste</td></tr>
+          <tr><td><kbd>Ctrl+F</kbd></td><td class="field-desc">Search in active editor</td></tr>
+          <tr><td><kbd>Ctrl+R</kbd></td><td class="field-desc">Replace in active editor</td></tr>
+          <tr><td><kbd>F1</kbd></td><td class="field-desc">Open documentation (this page)</td></tr>
+        </table>
+      </section>
+
+      <!-- ─── ERRORS ─── -->
+      <section id="errors">
+        <h2><span class="h2-icon">⚠</span> Errors &amp; warnings</h2>
+
+        <h3>Model errors</h3>
+
+        <div class="callout danger">
+          <div>
+            <strong>Cannot parse model: …</strong><br>
+            <span style="color:var(--text2)">The uploaded file could not be read by spectrojotometer. Check that the CIF is valid (try opening it in VESTA or a CIF validator). The error message in the log should indicate the problematic line.</span>
+          </div>
+        </div>
+
+        <div class="callout danger">
+          <div>
+            <strong>Cannot switch tab: no session. Load a .cif file first.</strong><br>
+            <span style="color:var(--text2)">You attempted to navigate to Tab 2 or 3 before any model was loaded. Open a <code>.cif</code> or <code>.struct</code> file first.</span>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <div>
+            <strong>No bonds defined. Run Add bonds first.</strong><br>
+            <span style="color:var(--text2)">The Optimize or Evaluate operations require at least one bond type. Go to Tab 1 and press <em>Add bonds</em>.</span>
+          </div>
+        </div>
+
+        <h3>Configuration errors</h3>
+
+        <div class="callout danger">
+          <div>
+            <strong>Need at least N configurations with known energies to determine M coupling constants.</strong><br>
+            <span style="color:var(--text2)">You have fewer <code>non-nan</code> energy values than required. Add more DFT results (at least <em>N<sub>bonds</sub> + 1</em>) to the configuration editor.</span>
+          </div>
+        </div>
+
+        <div class="callout danger">
+          <div>
+            <strong>Parse error at line N: expected '&lt;energy&gt; &lt;config&gt;'</strong><br>
+            <span style="color:var(--text2)">A line in the configuration editor is not in the expected format. Check that every non-comment line has an energy (or <code>nan</code>) followed by a bracketed spin list.</span>
+          </div>
+        </div>
+
+        <h3>Results warnings</h3>
+
+        <div class="callout warn">
+          <div>
+            <strong>⚠ Incompatible model</strong> (red parameter cards, energy errors out of bounds)<br>
+            <span style="color:var(--text2)">One or more energy errors lie outside ±1 in the normalized residual chart, and one or more coupling constants have <em>negative</em> error bounds. This means the linear model <em>A·J = E</em> is not consistent with your DFT energies within the stated tolerance. Possible causes:</span>
+            <ul style="margin-top:8px;line-height:2;padding-left:18px;color:var(--text2)">
+              <li>The actual exchange interactions are not well described by a Heisenberg model with only the bond types defined.</li>
+              <li>The DFT energies have larger errors than the tolerance you specified — try increasing <em>Energy tol.</em></li>
+              <li>Some spin configurations are too similar (linearly dependent) — regenerate with more optimization iterations.</li>
+              <li>You need to include further-neighbor bonds — increase <em>rmax</em> and regenerate.</li>
+            </ul>
+          </div>
+        </div>
+
+        <h3>Bond generation warnings</h3>
+
+        <div class="callout warn">
+          <div>
+            <strong>Bond generation failed: …</strong><br>
+            <span style="color:var(--text2)">An unexpected error occurred in spectrojotometer's bond search. Try adjusting <em>rmin</em>/<em>rmax</em> or the discretization, or check the log for more details.</span>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /content -->
+  </main>
+</div><!-- /shell -->
+
+<script>
+// Highlight active nav link based on scroll position
+const sections = document.querySelectorAll('section[id]');
+const navLinks  = document.querySelectorAll('.nav-link');
+
+function updateNav() {
+  let current = '';
+  sections.forEach(s => {
+    if (window.scrollY >= s.offsetTop - 80) current = s.id;
+  });
+  navLinks.forEach(a => {
+    const href = a.getAttribute('href').replace('#','');
+    a.classList.toggle('active', href === current);
+  });
+}
+
+window.addEventListener('scroll', updateNav, {passive:true});
+document.addEventListener('DOMContentLoaded', updateNav);
+</script>
+</body>
+</html>
