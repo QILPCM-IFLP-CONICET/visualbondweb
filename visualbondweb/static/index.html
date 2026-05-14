@@ -667,6 +667,291 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--border2); }
+
+  /* ── Help drawer ── */
+  .help-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 800;
+  }
+  .help-overlay.open { display: block; }
+
+  .help-drawer {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: 520px;
+    background: var(--bg);
+    border-left: 1px solid var(--border2);
+    box-shadow: -12px 0 40px rgba(0,0,0,.5);
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+    overflow: hidden;
+  }
+  .help-drawer.open { transform: translateX(0); }
+
+  .help-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 44px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 10px;
+  }
+  .help-drawer-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .help-drawer-title .hdot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+  .help-drawer-close {
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    color: var(--text3);
+    font-size: 15px;
+    transition: background .1s, color .1s;
+    flex-shrink: 0;
+  }
+  .help-drawer-close:hover { background: var(--bg3); color: var(--text); }
+
+  /* nav tabs inside drawer */
+  .help-tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 8px;
+    flex-shrink: 0;
+    gap: 2px;
+    overflow-x: auto;
+  }
+  .help-tab {
+    padding: 7px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color .12s, border-color .12s;
+    white-space: nowrap;
+  }
+  .help-tab:hover { color: var(--text2); }
+  .help-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* help content area */
+  .help-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+  .help-section {
+    display: none;
+    padding: 20px 22px 32px;
+  }
+  .help-section.active { display: block; }
+
+  /* help typography */
+  .help-section h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .help-section h3 {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin: 20px 0 8px;
+  }
+  .help-section p {
+    font-size: 12.5px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-bottom: 10px;
+  }
+  .help-section code {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--accent2);
+  }
+  .help-section pre {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    color: var(--text2);
+    line-height: 1.65;
+    margin: 8px 0 12px;
+    overflow-x: auto;
+  }
+  .help-section pre .hc  { color: var(--text3); }
+  .help-section pre .hv  { color: var(--green); }
+  .help-section pre .hs  { color: var(--amber); }
+  .help-param-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin: 8px 0 14px;
+  }
+  .help-param-table th {
+    text-align: left;
+    padding: 5px 10px;
+    background: var(--bg3);
+    color: var(--text3);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .help-param-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+  .help-param-table tr:last-child td { border-bottom: none; }
+  .help-param-table .pname {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent2);
+    white-space: nowrap;
+  }
+  .help-param-table .pdef {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+  .help-callout {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text2);
+    margin: 10px 0;
+  }
+  .help-callout.info  { background: rgba(74,158,255,.07);  border: 1px solid rgba(74,158,255,.2); }
+  .help-callout.warn  { background: rgba(246,166,35,.07);  border: 1px solid rgba(246,166,35,.2); }
+  .help-callout.tip   { background: rgba(62,207,142,.07);  border: 1px solid rgba(62,207,142,.2); }
+  .help-callout strong { color: var(--text); }
+
+  /* equation display */
+  .help-eq {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    color: var(--text2);
+    line-height: 1.9;
+    margin: 8px 0 12px;
+  }
+  .help-eq .eq-a { color: var(--accent); }
+  .help-eq .eq-j { color: var(--green); }
+  .help-eq .eq-e { color: var(--amber); }
+  .help-eq .eq-c { color: var(--text3); font-size: 10px; }
+
+  /* cite block */
+  .help-cite {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.8;
+    margin: 10px 0;
+  }
+  .help-cite a { color: var(--accent); text-decoration: none; }
+  .help-cite a:hover { text-decoration: underline; }
+
+  /* ── ? help button on field rows ── */
+  .help-btn {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text3);
+    font-size: 9px;
+    font-family: var(--mono);
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color .12s, color .12s, background .12s;
+    line-height: 1;
+    padding: 0;
+    vertical-align: middle;
+  }
+  .help-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(74,158,255,.1);
+  }
+
+  /* popover */
+  .help-popover {
+    display: none;
+    position: fixed;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 10px 13px;
+    max-width: 240px;
+    font-size: 11.5px;
+    color: var(--text2);
+    line-height: 1.6;
+    z-index: 1000;
+    box-shadow: 0 6px 20px rgba(0,0,0,.5);
+    pointer-events: none;
+  }
+  .help-popover.visible { display: block; }
+  .help-popover strong { color: var(--text); font-size: 11px; }
+  .help-popover .pop-def {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 3px;
+  }
+  .help-popover .pop-more {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--accent);
+    cursor: pointer;
+    pointer-events: all;
+  }
+  .help-popover .pop-more:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -716,7 +1001,7 @@
     <div class="menu-item" onclick="toggleMenu(this)">
       Help
       <div class="dropdown">
-        <div class="dd-item">Documentation <span class="kbd">F1</span></div>
+        <div class="dd-item" onclick="openHelp()">Documentation <span class="kbd">F1</span></div>
         <div class="dd-item" onclick="showAbout()">About…</div>
       </div>
     </div>
@@ -754,14 +1039,17 @@
         <div class="field-row">
           <span class="field-label">Discretization:</span>
           <input type="number" id="p1-discr" value="0.02" step="0.01">
+          <button class="help-btn" onclick="showPopover(this,'discr')">?</button>
         </div>
         <div class="field-row">
           <span class="field-label">rmin (Å):</span>
           <input type="number" id="p1-rmin" value="0.0" step="0.1">
+          <button class="help-btn" onclick="showPopover(this,'rmin')">?</button>
         </div>
         <div class="field-row">
           <span class="field-label">rmax (Å):</span>
           <input type="number" id="p1-rmax" value="4.9" step="0.1">
+          <button class="help-btn" onclick="showPopover(this,'rmax')">?</button>
         </div>
         <button class="btn primary btn-full" onclick="addBonds()">
           ⬡ Add bonds
@@ -769,7 +1057,7 @@
       </div>
 
       <!-- Grow Lattice: controls supercell_size for generate_bonds -->
-      <div class="panel-label">Grow lattice</div>
+      <div class="panel-label">Grow lattice <button class="help-btn" style="margin-left:4px" onclick="showPopover(this,'supercell')">?</button></div>
       <div class="section-block">
         <div class="field-row">
           <span class="field-label">Lx:</span>
@@ -837,14 +1125,17 @@
         <div class="field-row">
           <span class="field-label">Num. configs:</span>
           <input type="number" id="p2-nconf" value="10" min="1" step="1">
+          <button class="help-btn" onclick="showPopover(this,'nconf')">?</button>
         </div>
         <div class="field-row">
           <span class="field-label">Bunch size:</span>
           <input type="number" id="p2-bunch" value="10" min="1" step="1">
+          <button class="help-btn" onclick="showPopover(this,'bunch')">?</button>
         </div>
         <div class="field-row">
           <span class="field-label">Iterations:</span>
           <input type="number" id="p2-iter" value="100" min="1" step="1">
+          <button class="help-btn" onclick="showPopover(this,'iterations')">?</button>
         </div>
         <button class="btn primary btn-full" onclick="optimizeConfigs()">
           ⬟ Optimize
@@ -905,11 +1196,12 @@
         <div class="field-row">
           <span class="field-label">Energy tol.:</span>
           <input type="number" id="p3-tol" value="0.001" step="0.0001">
+          <button class="help-btn" onclick="showPopover(this,'etol')">?</button>
         </div>
       </div>
 
       <!-- Error method -->
-      <div class="panel-label">Error bound method</div>
+      <div class="panel-label">Error bound method <button class="help-btn" style="margin-left:4px" onclick="showPopover(this,'errmethod')">?</button></div>
       <div class="section-block">
         <div class="radio-group">
           <label class="radio-row">
@@ -923,10 +1215,12 @@
           <div class="field-row">
             <span class="field-label">Num. samples:</span>
             <input type="number" id="p3-mcsteps" value="1000" step="100">
+            <button class="help-btn" onclick="showPopover(this,'mcsteps')">?</button>
           </div>
           <div class="field-row">
             <span class="field-label">Size factor:</span>
             <input type="number" id="p3-mcfactor" value="1.0" step="0.1">
+            <button class="help-btn" onclick="showPopover(this,'mcfactor')">?</button>
           </div>
         </div>
       </div>
@@ -1070,6 +1364,224 @@
     </div>
   </div>
 </div>
+
+<!-- ═══════════════════ HELP DRAWER ═══════════════════ -->
+<div class="help-overlay" id="helpOverlay" onclick="closeHelp()"></div>
+<div class="help-drawer" id="helpDrawer">
+  <div class="help-drawer-header">
+    <div class="help-drawer-title">
+      <span class="hdot"></span>
+      Documentation
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <a href="/static/help.html" target="_blank"
+         style="font-size:10px;color:var(--text3);text-decoration:none;font-family:var(--mono);padding:3px 8px;border:1px solid var(--border);border-radius:4px;transition:color .12s,border-color .12s"
+         onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
+         onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border)'">
+        ↗ open full
+      </a>
+      <div class="help-drawer-close" onclick="closeHelp()">✕</div>
+    </div>
+  </div>
+
+  <div class="help-tabs">
+    <div class="help-tab active" onclick="switchHelpTab('overview')">Overview</div>
+    <div class="help-tab" onclick="switchHelpTab('tab1')">1 · Define Model</div>
+    <div class="help-tab" onclick="switchHelpTab('tab2')">2 · Configurations</div>
+    <div class="help-tab" onclick="switchHelpTab('tab3')">3 · Evaluate</div>
+    <div class="help-tab" onclick="switchHelpTab('method')">Method</div>
+    <div class="help-tab" onclick="switchHelpTab('citation')">Citation</div>
+  </div>
+
+  <div class="help-body">
+
+    <!-- ── Overview ── -->
+    <div class="help-section active" id="hs-overview">
+      <h2>Visualbond — spectrojotometer 0.2</h2>
+      <p>Visualbond extracts the exchange coupling constants <em>J<sub>i</sub></em> of a
+      Heisenberg spin Hamiltonian from ab initio (DFT) total energies:</p>
+      <div class="help-eq">
+        <span class="eq-a">H</span> = −Σ<sub>⟨i,j⟩</sub> <span class="eq-j">J<sub>ij</sub></span> <span class="eq-e">S<sub>i</sub>·S<sub>j</sub></span><br>
+        <span class="eq-c"># J &gt; 0 ferromagnetic · J &lt; 0 antiferromagnetic</span>
+      </div>
+      <h3>Workflow</h3>
+      <p><strong style="color:var(--accent)">Tab 1</strong> — Load a <code>.cif</code> or <code>.struct</code> crystal structure and define the exchange bond range.</p>
+      <p><strong style="color:var(--green)">Tab 2</strong> — Generate an optimal set of spin configurations to use as DFT inputs. Inspect the linear equations.</p>
+      <p><strong style="color:var(--amber)">Tab 3</strong> — Enter the DFT total energies and compute the coupling constants with error bounds.</p>
+      <div class="help-callout tip">
+        <span>✦</span>
+        <span>Tabs 2 and 3 unlock automatically once a valid model is loaded and the CIF passes validation on leaving Tab 1.</span>
+      </div>
+      <h3>File formats</h3>
+      <table class="help-param-table">
+        <tr><th>Extension</th><th>Description</th></tr>
+        <tr><td class="pname">.cif / .struct</td><td>Crystal structure input</td></tr>
+        <tr><td class="pname">.spin</td><td>Spin configuration file (energy + config + label per line)</td></tr>
+      </table>
+      <h3>Keyboard shortcuts</h3>
+      <table class="help-param-table">
+        <tr><th>Key</th><th>Action</th></tr>
+        <tr><td class="pname">F1</td><td>Open this documentation panel</td></tr>
+        <tr><td class="pname">Ctrl+O</td><td>Open model file</td></tr>
+        <tr><td class="pname">Ctrl+F</td><td>Search in active editor</td></tr>
+        <tr><td class="pname">Esc</td><td>Close this panel</td></tr>
+      </table>
+    </div>
+
+    <!-- ── Tab 1 ── -->
+    <div class="help-section" id="hs-tab1">
+      <h2>Tab 1 — Define Model</h2>
+      <p>Load your crystal structure and define which pairs of magnetic sites interact.</p>
+
+      <h3>Loading a file</h3>
+      <p>Click the upload zone or use <strong>File → Open model file…</strong> (<code>Ctrl+O</code>). Accepted formats: <code>.cif</code> and <code>.struct</code>. The CIF is shown in the editor and can be edited directly.</p>
+      <div class="help-callout info">
+        <span>ℹ</span>
+        <span>Navigating to Tab 2 triggers a silent CIF validation. If the file cannot be parsed the tab switch is blocked.</span>
+      </div>
+
+      <h3>Add bonds parameters</h3>
+      <table class="help-param-table">
+        <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+        <tr>
+          <td class="pname">rmin</td><td class="pdef">0.0 Å</td>
+          <td>Minimum bond length. Pairs closer than this are ignored.</td>
+        </tr>
+        <tr>
+          <td class="pname">rmax</td><td class="pdef">4.9 Å</td>
+          <td>Maximum bond length. All symmetry-inequivalent magnetic pairs within this distance are grouped into bond types (J₁, J₂, …). Increase to include more distant neighbors.</td>
+        </tr>
+        <tr>
+          <td class="pname">Discretization</td><td class="pdef">0.02 Å</td>
+          <td>Resolution for grouping bond lengths. Two bonds closer than this value are treated as equivalent.</td>
+        </tr>
+      </table>
+
+      <h3>Grow lattice (supercell)</h3>
+      <p>Lx / Ly / Lz expand the primitive cell before bond generation. Use a supercell when spin configurations span more than one unit cell.</p>
+      <div class="help-callout tip">
+        <span>✦</span>
+        <span>Start with 1×1×1. Enlarge only if the optimizer reports a poor condition number after generating configurations.</span>
+      </div>
+    </div>
+
+    <!-- ── Tab 2 ── -->
+    <div class="help-section" id="hs-tab2">
+      <h2>Tab 2 — Spin Configurations</h2>
+      <p>Build the set of spin configurations that minimizes the condition number of the linear system <em>A·J = E</em>.</p>
+
+      <h3>.spin file format</h3>
+      <pre><span class="hc"># Energy   [config]          # label</span>
+<span class="hv">nan</span>  <span class="hs">[0,1,0,1,0,1,0]</span>  <span class="hc"># AFM_1</span>
+<span class="hv">nan</span>  <span class="hs">[0,0,0,0,0,0,0]</span>  <span class="hc"># Ferro_up</span></pre>
+      <p><code>0</code> = spin up · <code>1</code> = spin down · <code>nan</code> = energy not yet known</p>
+
+      <h3>Optimize parameters</h3>
+      <table class="help-param-table">
+        <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+        <tr>
+          <td class="pname">Num. configs</td><td class="pdef">10</td>
+          <td>Configurations to generate. You need at least N<sub>bonds</sub>+1 with known energies to determine all J values.</td>
+        </tr>
+        <tr>
+          <td class="pname">Bunch size</td><td class="pdef">10</td>
+          <td>Candidate pool size per iteration. Larger = better quality, slower.</td>
+        </tr>
+        <tr>
+          <td class="pname">Iterations</td><td class="pdef">100</td>
+          <td>Optimization steps. More iterations → lower condition number.</td>
+        </tr>
+      </table>
+      <p><strong>◈ Optimal independent set</strong> — finds the smallest subset of existing configurations that spans the full coupling-constant space.</p>
+
+      <h3>Equations panel</h3>
+      <p>Shows the linear system derived from the current configurations. Format can be switched to <strong>LaTeX</strong> or <strong>Wolfram</strong>. Updates automatically as you type.</p>
+    </div>
+
+    <!-- ── Tab 3 ── -->
+    <div class="help-section" id="hs-tab3">
+      <h2>Tab 3 — Set Energies &amp; Evaluate</h2>
+      <p>Replace <code>nan</code> with DFT total energies, then press <strong>⬗ Estimate parameters</strong>.</p>
+
+      <h3>Energy tolerance</h3>
+      <p>The assumed uncertainty on each DFT energy (same units as the energies). Should match your DFT convergence threshold.</p>
+
+      <h3>Error bound method</h3>
+      <table class="help-param-table">
+        <tr><th>Method</th><th>Description</th></tr>
+        <tr><td class="pname">Quadratic</td><td>Analytic upper bound — fast, conservative.</td></tr>
+        <tr><td class="pname">Monte Carlo</td><td>Samples random energy perturbations within the tolerance. More realistic. Recommended for final results.</td></tr>
+      </table>
+
+      <h3>Monte Carlo parameters</h3>
+      <table class="help-param-table">
+        <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
+        <tr><td class="pname">Num. samples</td><td class="pdef">1000</td><td>Random perturbation samples. Use 5000–10000 for publication results.</td></tr>
+        <tr><td class="pname">Size factor</td><td class="pdef">1.0</td><td>Scales perturbation amplitude relative to energy tolerance. Keep at 1.0.</td></tr>
+      </table>
+
+      <h3>Reading results</h3>
+      <p>Parameter cards show the fitted J values ± error. A <strong style="color:var(--red)">red / incompatible</strong> card means the model cannot explain the data within the stated tolerance — try increasing rmax or the energy tolerance.</p>
+      <p>The energy error chart shows normalized residuals ΔE<sub>i</sub>/ΔE. All bars should stay within the ±1 amber lines.</p>
+    </div>
+
+    <!-- ── Method ── -->
+    <div class="help-section" id="hs-method">
+      <h2>The method</h2>
+      <p>Full derivation in: Matera et al., <em>Comput. Mater. Sci.</em> <strong>178</strong>, 109628 (2020). <a href="https://doi.org/10.1016/j.commatsci.2020.109628" target="_blank" style="color:var(--accent)">doi:10.1016/j.commatsci.2020.109628</a></p>
+
+      <h3>Linear model</h3>
+      <p>The total energy for a collinear spin configuration <strong>σ</strong> is written as:</p>
+      <div class="help-eq">
+        <span class="eq-e">E(<strong>σ</strong>)</span> = E₀ + Σ<sub>k</sub> <span class="eq-j">J<sub>k</sub></span> <span class="eq-a">A<sub>k</sub>(<strong>σ</strong>)</span><br>
+        <span class="eq-c"># A_k(σ) = antiparallel pairs of bond type k in σ</span>
+      </div>
+      <p>Computing M configurations gives the linear system <strong>A·J = E</strong>, solved by least squares.</p>
+
+      <h3>Optimal configurations</h3>
+      <p>The optimizer minimizes the condition number κ(<strong>A</strong>) using a greedy search: at each step it picks the candidate configuration (from a random pool of size <em>bunch</em>) that most reduces κ. A smaller κ means the ratio |ΔJ|/|ΔE| is smaller — more accurate J values for the same DFT precision.</p>
+
+      <h3>Error bounds</h3>
+      <p><strong>Quadratic:</strong> δJ ≤ ‖A⁺‖ · δE — analytic, always valid, conservative.</p>
+      <p><strong>Monte Carlo:</strong> std(J) over N samples of E + Uniform(−δE, +δE) — more realistic estimate.</p>
+      <p>A <strong>negative</strong> error bound means the system is incompatible: the data cannot be reproduced by any J within ±δE of the input energies.</p>
+    </div>
+
+    <!-- ── Citation ── -->
+    <div class="help-section" id="hs-citation">
+      <h2>Citation</h2>
+      <p>If you use Visualbond or spectrojotometer in your research, please cite:</p>
+      <div class="help-cite">
+        J.M. Matera, L.A. Errico, A.V. Gil Rebaza, V.I. Fernandez, C.A. Lamas<br>
+        <strong>Optimizing configurations for determining the magnetic model based on ab initio calculations</strong><br>
+        <em>Computational Materials Science</em> <strong>178</strong>, 109628 (2020)<br>
+        <a href="https://doi.org/10.1016/j.commatsci.2020.109628" target="_blank">doi:10.1016/j.commatsci.2020.109628</a>
+      </div>
+      <h3>BibTeX</h3>
+      <pre>@article{Matera2020,
+  author  = {Matera, J.M. and Errico, L.A. and
+             Gil Rebaza, A.V. and Fernandez, V.I.
+             and Lamas, C.A.},
+  title   = {Optimizing configurations for
+             determining the magnetic model
+             based on ab initio calculations},
+  journal = {Computational Materials Science},
+  volume  = {178},
+  pages   = {109628},
+  year    = {2020},
+  doi     = {10.1016/j.commatsci.2020.109628},
+}</pre>
+      <div class="help-callout tip">
+        <span>✦</span>
+        <span>Visualbond is developed at <strong>IFLP-CONICET / UNLP</strong>, La Plata, Argentina.</span>
+      </div>
+    </div>
+
+  </div><!-- /help-body -->
+</div><!-- /help-drawer -->
+
+<!-- popover (singleton) -->
+<div class="help-popover" id="helpPopover"></div>
 
 <!-- hidden file input -->
 <input type="file" id="fileInputHidden" accept=".cif,.struct" style="display:none" onchange="loadFileHidden(this)">
