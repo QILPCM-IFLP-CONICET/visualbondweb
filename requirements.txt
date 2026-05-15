@@ -1,5 +1,7 @@
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
-httpx>=0.27.0          # para tests
+numpy>=1.24
+ruamel.yaml>=0.17.0
+httpx>=0.27.0
 spectrojotometer @ git+https://github.com/QILPCM-IFLP-CONICET/spectrojotometer
