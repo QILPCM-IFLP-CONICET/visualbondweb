@@ -2081,11 +2081,73 @@ function callSearch() {
   el.setSelectionRange(idx, idx + query.length);
 }
 
-// ── About ──
-function showAbout() {
-  alert('Visualbond 0.2 — 2024\nspectrojotometer web interface\n\nA tool to determine coupling constants\nin Heisenberg-like magnetic models\nfrom ab initio simulations.\n\nIFLP-CONICET / UNLP');
-}
+  // ── About ──
 
+function showAbout() {
+  const about = document.createElement('div');
+
+  about.innerHTML = `
+    <div style="
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.6);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:2000;
+    ">
+      <div style="
+        background:var(--bg2);
+        border:1px solid var(--border2);
+        border-radius:10px;
+        padding:24px;
+        width:360px;
+        text-align:center;
+        box-shadow:0 20px 60px rgba(0,0,0,.5);
+      ">
+        <img src="/static/logo.svg"
+             alt="Visualbond logo"
+             style="width:96px;height:auto;background:white;padding:6px;border-radius:8px;margin-bottom:16px">
+
+        <div style="
+          font-size:20px;
+          font-weight:600;
+          color:var(--text);
+          margin-bottom:4px;
+        ">
+          Visualbond
+        </div>
+
+        <div style="
+          font-size:12px;
+          color:var(--text3);
+          text-transform:uppercase;
+          letter-spacing:.08em;
+          margin-bottom:18px;
+        ">
+          spectrojotometer 0.2
+        </div>
+
+        <div style="
+          font-size:13px;
+          line-height:1.7;
+          color:var(--text2);
+        ">
+          Developed at IFLP-CONICET / UNLP<br>
+          La Plata, Argentina
+        </div>
+
+        <button class="btn"
+                style="margin-top:20px"
+                onclick="this.closest('div[style*=fixed]').remove()">
+          Close
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(about);
+}
 // ── Tab sync — mirrors the Tkinter behaviour ──────────────────────────────────
 //
 // The two config editors (tab 2 = spinEditor, tab 3 = energyEditor) share the
