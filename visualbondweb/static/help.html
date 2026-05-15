@@ -963,7 +963,7 @@
           </tr>
           <tr>
             <td class="field-name">Monte Carlo</td>
-            <td class="field-desc">Samples random perturbations of the input energies within the specified tolerance and estimates the standard deviation of <em>J</em>. More accurate than the quadratic bound. Recommended for final results.</td>
+            <td class="field-desc">Samples values for the coupling constants with a gaussian distribution centered on the least square solution. Then, discard all the samples leading to a set of energies which differs for some configurations from its DFT estimation in more than a given tolerance. Using the remaining set, the confidence interval for each coupling constant  <em>J</em> is evaluated as the minimal interval compatible with all the valid samples. This approach is more accurate than the quadratic bound, and is the recommended for final results.</td>
           </tr>
         </table>
 
