@@ -2179,6 +2179,168 @@ document.addEventListener('DOMContentLoaded', () => {
     }).observe(document.getElementById('chiPanel'));
   }
 });
+
+// ═══════════════════════════════════════════════════════════
+//  HELP DRAWER
+// ═══════════════════════════════════════════════════════════
+
+function openHelp(tabId) {
+  document.getElementById('helpOverlay').classList.add('open');
+  document.getElementById('helpDrawer').classList.add('open');
+  if (tabId) switchHelpTab(tabId);
+}
+
+function closeHelp() {
+  document.getElementById('helpOverlay').classList.remove('open');
+  document.getElementById('helpDrawer').classList.remove('open');
+}
+
+function switchHelpTab(id) {
+  // Update tab buttons
+  document.querySelectorAll('.help-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('onclick').includes("'" + id + "'"));
+  });
+  // Update sections
+  document.querySelectorAll('.help-section').forEach(s => {
+    s.classList.toggle('active', s.id === 'hs-' + id);
+  });
+}
+
+// Open help drawer to the relevant section when clicking the active app tab
+document.addEventListener('DOMContentLoaded', () => {
+  const tabHelpMap = { tab1: 'tab1', tab2: 'tab2', tab3: 'tab3' };
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('dblclick', () => {
+      const id = t.id;
+      if (tabHelpMap[id]) openHelp(tabHelpMap[id]);
+    });
+  });
+});
+
+// F1 opens drawer
+document.addEventListener('keydown', e => {
+  if (e.key === 'F1') { e.preventDefault(); openHelp(); }
+  if (e.key === 'Escape') closeHelp();
+});
+
+// ═══════════════════════════════════════════════════════════
+//  CONTEXTUAL POPOVERS
+// ═══════════════════════════════════════════════════════════
+
+const HELP_TIPS = {
+  rmin: {
+    label: 'rmin (Å)',
+    def: 'Default: 0.0',
+    text: 'Minimum bond length. Pairs of magnetic sites closer than this distance are ignored. Useful to exclude self-interactions.',
+    section: 'tab1'
+  },
+  rmax: {
+    label: 'rmax (Å)',
+    def: 'Default: 4.9',
+    text: 'Maximum bond length. All symmetry-inequivalent pairs within this range are grouped into bond types J₁, J₂, … Increase to include more distant neighbors.',
+    section: 'tab1'
+  },
+  discr: {
+    label: 'Discretization (Å)',
+    def: 'Default: 0.02',
+    text: 'Resolution for grouping bond lengths. Two bonds differing by less than this value are treated as equivalent.',
+    section: 'tab1'
+  },
+  supercell: {
+    label: 'Grow lattice',
+    def: 'Default: 1×1×1',
+    text: 'Expands the primitive cell before bond generation. Use a supercell when configurations must span more than one unit cell.',
+    section: 'tab1'
+  },
+  nconf: {
+    label: 'Num. configs',
+    def: 'Default: 10',
+    text: 'Number of spin configurations to generate. You need at least N_bonds + 1 configurations with known energies to determine all coupling constants.',
+    section: 'tab2'
+  },
+  bunch: {
+    label: 'Bunch size',
+    def: 'Default: 10',
+    text: 'Size of the random candidate pool evaluated at each optimization step. Larger values improve quality at the cost of speed.',
+    section: 'tab2'
+  },
+  iterations: {
+    label: 'Iterations',
+    def: 'Default: 100',
+    text: 'Number of greedy optimization steps. More iterations yield a lower condition number κ(A) and therefore more accurate J values.',
+    section: 'tab2'
+  },
+  etol: {
+    label: 'Energy tolerance',
+    def: 'Default: 0.001',
+    text: 'Assumed uncertainty on each DFT total energy, in the same units as the energies. Should match your DFT convergence threshold.',
+    section: 'tab3'
+  },
+  errmethod: {
+    label: 'Error bound method',
+    def: '',
+    text: 'Quadratic: fast analytic upper bound — conservative. Monte Carlo: samples random energy perturbations — more realistic, recommended for publications.',
+    section: 'tab3'
+  },
+  mcsteps: {
+    label: 'Num. samples',
+    def: 'Default: 1000',
+    text: 'Number of Monte Carlo samples. Use 1000 for exploration, 5000–10000 for publication-quality uncertainties.',
+    section: 'tab3'
+  },
+  mcfactor: {
+    label: 'Size factor',
+    def: 'Default: 1.0',
+    text: 'Scales the amplitude of random perturbations relative to the energy tolerance. Keep at 1.0 unless you have a specific reason to change it.',
+    section: 'tab3'
+  }
+};
+
+let _popoverTimer = null;
+
+function showPopover(btn, key) {
+  const tip = HELP_TIPS[key];
+  if (!tip) return;
+
+  const pop = document.getElementById('helpPopover');
+
+  pop.innerHTML =
+    '<strong>' + tip.label + '</strong>' +
+    (tip.def ? '<div class="pop-def">' + tip.def + '</div>' : '') +
+    '<div style="margin-top:5px">' + tip.text + '</div>' +
+    '<div class="pop-more" onclick="openHelp(\'' + tip.section + '\');hidePopover()">Read more →</div>';
+
+  // Position: above the button, horizontally centred
+  const rect = btn.getBoundingClientRect();
+  pop.style.display = 'block';
+  const pw = pop.offsetWidth;
+  let left = rect.left + rect.width / 2 - pw / 2;
+  // Keep within viewport
+  left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
+  const top = rect.top - pop.offsetHeight - 8;
+
+  pop.style.left = left + 'px';
+  pop.style.top  = (top < 8 ? rect.bottom + 8 : top) + 'px';
+  pop.classList.add('visible');
+
+  // Auto-hide after 6 s
+  clearTimeout(_popoverTimer);
+  _popoverTimer = setTimeout(hidePopover, 6000);
+}
+
+function hidePopover() {
+  const pop = document.getElementById('helpPopover');
+  pop.classList.remove('visible');
+  pop.style.display = 'none';
+}
+
+// Hide popover when clicking elsewhere
+document.addEventListener('click', e => {
+  if (!e.target.classList.contains('help-btn') &&
+      !e.target.closest('#helpPopover')) {
+    hidePopover();
+  }
+});
 </script>
 </body>
 </html>
