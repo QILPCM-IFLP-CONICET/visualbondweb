@@ -249,7 +249,7 @@
   .field-label {
     font-size: 12px;
     color: var(--text2);
-    min-width: 90px;
+    min-width: 80px;
     flex-shrink: 0;
   }
   input[type="text"], input[type="number"] {
@@ -260,7 +260,7 @@
     font-family: var(--mono);
     font-size: 12px;
     padding: 4px 8px;
-    width: 80px;
+    width: 68px;
     transition: border-color .15s;
     outline: none;
   }
@@ -1001,7 +1001,7 @@
     <div class="menu-item" onclick="toggleMenu(this)">
       Help
       <div class="dropdown">
-        <div class="dd-item" onclick="openHelp()">Documentation <span class="kbd">F1</span></div>
+        <div class="dd-item" onclick="document.querySelectorAll('.menu-item.open').forEach(m=>m.classList.remove('open')); openHelp()">Documentation <span class="kbd">F1</span></div>
         <div class="dd-item" onclick="showAbout()">About…</div>
       </div>
     </div>
@@ -1039,17 +1039,17 @@
         <div class="field-row">
           <span class="field-label">Discretization:</span>
           <input type="number" id="p1-discr" value="0.02" step="0.01">
-          <button class="help-btn" onclick="showPopover(this,'discr')">?</button>
+          <button class="help-btn" onclick="showHelpPopover(this,'discr')">?</button>
         </div>
         <div class="field-row">
           <span class="field-label">rmin (Å):</span>
           <input type="number" id="p1-rmin" value="0.0" step="0.1">
-          <button class="help-btn" onclick="showPopover(this,'rmin')">?</button>
+          <button class="help-btn" onclick="showHelpPopover(this,'rmin')">?</button>
         </div>
         <div class="field-row">
           <span class="field-label">rmax (Å):</span>
           <input type="number" id="p1-rmax" value="4.9" step="0.1">
-          <button class="help-btn" onclick="showPopover(this,'rmax')">?</button>
+          <button class="help-btn" onclick="showHelpPopover(this,'rmax')">?</button>
         </div>
         <button class="btn primary btn-full" onclick="addBonds()">
           ⬡ Add bonds
@@ -1057,7 +1057,7 @@
       </div>
 
       <!-- Grow Lattice: controls supercell_size for generate_bonds -->
-      <div class="panel-label">Grow lattice <button class="help-btn" style="margin-left:4px" onclick="showPopover(this,'supercell')">?</button></div>
+      <div class="panel-label">Grow lattice <button class="help-btn" style="margin-left:4px" onclick="showHelpPopover(this,'supercell')">?</button></div>
       <div class="section-block">
         <div class="field-row">
           <span class="field-label">Lx:</span>
@@ -1125,17 +1125,17 @@
         <div class="field-row">
           <span class="field-label">Num. configs:</span>
           <input type="number" id="p2-nconf" value="10" min="1" step="1">
-          <button class="help-btn" onclick="showPopover(this,'nconf')">?</button>
+          <button class="help-btn" onclick="showHelpPopover(this,'nconf')">?</button>
         </div>
         <div class="field-row">
           <span class="field-label">Bunch size:</span>
           <input type="number" id="p2-bunch" value="10" min="1" step="1">
-          <button class="help-btn" onclick="showPopover(this,'bunch')">?</button>
+          <button class="help-btn" onclick="showHelpPopover(this,'bunch')">?</button>
         </div>
         <div class="field-row">
           <span class="field-label">Iterations:</span>
           <input type="number" id="p2-iter" value="100" min="1" step="1">
-          <button class="help-btn" onclick="showPopover(this,'iterations')">?</button>
+          <button class="help-btn" onclick="showHelpPopover(this,'iterations')">?</button>
         </div>
         <button class="btn primary btn-full" onclick="optimizeConfigs()">
           ⬟ Optimize
@@ -1196,12 +1196,12 @@
         <div class="field-row">
           <span class="field-label">Energy tol.:</span>
           <input type="number" id="p3-tol" value="0.001" step="0.0001">
-          <button class="help-btn" onclick="showPopover(this,'etol')">?</button>
+          <button class="help-btn" onclick="showHelpPopover(this,'etol')">?</button>
         </div>
       </div>
 
       <!-- Error method -->
-      <div class="panel-label">Error bound method <button class="help-btn" style="margin-left:4px" onclick="showPopover(this,'errmethod')">?</button></div>
+      <div class="panel-label">Error bound method <button class="help-btn" style="margin-left:4px" onclick="showHelpPopover(this,'errmethod')">?</button></div>
       <div class="section-block">
         <div class="radio-group">
           <label class="radio-row">
@@ -1215,12 +1215,12 @@
           <div class="field-row">
             <span class="field-label">Num. samples:</span>
             <input type="number" id="p3-mcsteps" value="1000" step="100">
-            <button class="help-btn" onclick="showPopover(this,'mcsteps')">?</button>
+            <button class="help-btn" onclick="showHelpPopover(this,'mcsteps')">?</button>
           </div>
           <div class="field-row">
             <span class="field-label">Size factor:</span>
             <input type="number" id="p3-mcfactor" value="1.0" step="0.1">
-            <button class="help-btn" onclick="showPopover(this,'mcfactor')">?</button>
+            <button class="help-btn" onclick="showHelpPopover(this,'mcfactor')">?</button>
           </div>
         </div>
       </div>
@@ -2298,7 +2298,7 @@ const HELP_TIPS = {
 
 let _popoverTimer = null;
 
-function showPopover(btn, key) {
+function showHelpPopover(btn, key) {
   const tip = HELP_TIPS[key];
   if (!tip) return;
 
@@ -2308,7 +2308,7 @@ function showPopover(btn, key) {
     '<strong>' + tip.label + '</strong>' +
     (tip.def ? '<div class="pop-def">' + tip.def + '</div>' : '') +
     '<div style="margin-top:5px">' + tip.text + '</div>' +
-    '<div class="pop-more" onclick="openHelp(\'' + tip.section + '\');hidePopover()">Read more →</div>';
+    '<div class="pop-more" onclick="openHelp(\'' + tip.section + '\');hideHelpPopover()">Read more →</div>';
 
   // Position: above the button, horizontally centred
   const rect = btn.getBoundingClientRect();
@@ -2325,10 +2325,10 @@ function showPopover(btn, key) {
 
   // Auto-hide after 6 s
   clearTimeout(_popoverTimer);
-  _popoverTimer = setTimeout(hidePopover, 6000);
+  _popoverTimer = setTimeout(hideHelpPopover, 6000);
 }
 
-function hidePopover() {
+function hideHelpPopover() {
   const pop = document.getElementById('helpPopover');
   pop.classList.remove('visible');
   pop.style.display = 'none';
@@ -2338,7 +2338,7 @@ function hidePopover() {
 document.addEventListener('click', e => {
   if (!e.target.classList.contains('help-btn') &&
       !e.target.closest('#helpPopover')) {
-    hidePopover();
+    hideHelpPopover();
   }
 });
 </script>
