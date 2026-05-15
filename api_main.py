@@ -53,7 +53,7 @@ TMPDIR = Path(tempfile.gettempdir()) / "visualbond"
 TMPDIR.mkdir(exist_ok=True)
 
 # ── Static files (frontend) ──────────────────────────────────────────────────
-STATIC_DIR = Path(__file__).parent / "static"
+STATIC_DIR = Path(__file__).parent / "visualbondweb" / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
