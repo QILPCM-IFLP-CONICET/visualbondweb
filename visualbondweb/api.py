@@ -501,7 +501,9 @@ def evaluate_couplings(req: EvaluateRequest):
         raise HTTPException(status_code=400, detail="No bonds defined.")
 
     try:
+        print("parse configs")
         energies, confs, labels = _parse_configs(req.configs_text, model)
+        print("   done")
     except HTTPException:
         raise
     except Exception as exc:
@@ -529,6 +531,7 @@ def evaluate_couplings(req: EvaluateRequest):
         )
 
     try:
+        print("compute couplings")
         js, jerr, chis, ar = model.compute_couplings(
             valid_confs,
             valid_energs,
@@ -537,6 +540,7 @@ def evaluate_couplings(req: EvaluateRequest):
             mcsteps=req.mc_steps if req.use_montecarlo else None,
             mcsizefactor=req.mc_size_factor,
         )
+        print("  done")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Coupling computation failed: {exc}")
 
@@ -545,7 +549,7 @@ def evaluate_couplings(req: EvaluateRequest):
     js_vals = js[:-1]                     # remove E0
     jmax = float(np.max(np.abs(js_vals))) if len(js_vals) else 1.0
     fmt = req.output_format
-    incompatible = bool(np.any(jerr < 0))
+    incompatible = bool(np.any(np.array(jerr) < 0))
 
     # Build parameter list
     parameters = [{"name": "E0", "value": offset_energy, "error": None, "incompatible": False}]
