@@ -1760,6 +1760,7 @@ async function loadFileHidden(input) {
     modelLoaded = true;
     bondsCount  = data.bonds.length;
     document.getElementById('modelEditor').value = modelText;
+    lastSyncedCifText = modelText.trim();
     document.getElementById('fileNamePill').textContent = file.name;
     document.getElementById('modelStat').textContent = modelText.split('\n').length + ' lines';
     enableTabs();
@@ -1780,6 +1781,14 @@ function loadFile(input) { loadFileHidden(input); }
 // ── Page 1 actions ──
 async function addBonds() {
   if (!modelLoaded) { log('Error: no model loaded.', 'err'); return; }
+  // Make sure the backend model reflects whatever is currently in the CIF
+  // editor before generating bonds (covers editing then clicking straight
+  // into Add bonds, without an intervening click elsewhere).
+  const synced = await syncModelFromEditor({ blocking: false });
+  if (!synced) {
+    log('Cannot add bonds: fix the CIF syntax error in the editor first.', 'err');
+    return;
+  }
   const rmin  = parseFloat(document.getElementById('p1-rmin').value);
   const rmax  = parseFloat(document.getElementById('p1-rmax').value);
   const discr = parseFloat(document.getElementById('p1-discr').value);
@@ -1792,6 +1801,7 @@ async function addBonds() {
       session_id: sessionId, rmin, rmax, discretization: discr, supercell_size: [lx, ly, lz]
     });
     document.getElementById('modelEditor').value = data.cif_text;
+    lastSyncedCifText = data.cif_text.trim();
     document.getElementById('modelStat').textContent = data.cif_text.split('\n').length + ' lines';
     bondsCount = data.num_bonds;
     updateStatus();
@@ -2219,6 +2229,98 @@ function onEnterTab(newTabId) {
   }
 }
 
+// ── CIF editor → server model sync ──
+// Tracks the last CIF text that was successfully parsed and pushed to the
+// backend session, so we don't re-validate on every blur if nothing changed.
+let lastSyncedCifText = null;
+// Tracks an in-progress validation so concurrent callers (e.g. the editor's
+// 'blur' firing right before a button's 'click', such as Add bonds) await
+// the same request instead of firing a duplicate POST /validate.
+let syncInFlightPromise = null;
+let syncInFlightText = null;
+
+/**
+ * Validate the current contents of the CIF editor against the backend and,
+ * on success, update the session's in-memory model (POST /model/{id}/validate
+ * both validates AND replaces sess["model"] server-side).
+ *
+ * Called from:
+ *  - switchTab(), leaving tab 1: `blocking = true` — a failure prevents the
+ *    tab switch, since tabs 2/3 need a valid, up-to-date model.
+ *  - modelEditor 'blur' handler: `blocking = false` — a failure only logs a
+ *    warning; the user stays on tab 1 and the previous valid model (if any)
+ *    remains in use server-side until the syntax error is fixed.
+ *  - addBonds(), before generating bonds: `blocking = false` — awaited so
+ *    bond generation always runs against the text currently in the editor,
+ *    not a stale model from before the last edit.
+ *
+ * Returns true if the model is valid and in sync, false otherwise.
+ */
+async function syncModelFromEditor({ blocking = false } = {}) {
+  const cif_text = document.getElementById('modelEditor').value.trim();
+
+  if (!cif_text) {
+    if (blocking) log('Cannot switch tab: model editor is empty.', 'err');
+    return !blocking;
+  }
+  if (!sessionId) {
+    if (blocking) log('Cannot switch tab: no session. Load a .cif file first.', 'err');
+    return !blocking;
+  }
+  if (cif_text === lastSyncedCifText) {
+    return true;   // nothing changed since the last successful sync
+  }
+  // Another caller is already validating this exact text — piggyback on it
+  // instead of sending a second, redundant request.
+  if (syncInFlightPromise && syncInFlightText === cif_text) {
+    return syncInFlightPromise;
+  }
+
+  // Show inline validation state in the status bar
+  document.getElementById('slModelTxt').textContent = 'Validating…';
+  syncInFlightText = cif_text;
+  syncInFlightPromise = (async () => {
+    try {
+      const data = await api('POST', `/model/${sessionId}/validate`, { cif_text });
+      // Update status with fresh model info
+      bondsCount = data.bonds.length;
+      document.getElementById('slModelTxt').textContent =
+        'Model OK — ' + data.num_atoms + ' atoms, ' + data.cell_size + ' sites';
+      document.getElementById('slBondsTxt').textContent =
+        bondsCount > 0 ? bondsCount + ' bond type(s)' : 'No bonds';
+      document.getElementById('slModel').classList.remove('err');
+      document.getElementById('slModel').classList.add('ok');
+      lastSyncedCifText = cif_text;
+      log('Model validated. atoms=' + data.num_atoms
+          + '  cell_size=' + data.cell_size
+          + '  bonds=' + bondsCount);
+      return true;
+    } catch (e) {
+      // api() already logged the error detail; add the practical consequence.
+      document.getElementById('slModelTxt').textContent = 'Invalid model';
+      document.getElementById('slModel').classList.remove('ok');
+      document.getElementById('slModel').classList.add('err');
+      log('Edited CIF could not be parsed — keeping the last valid model. '
+          + 'Fix the syntax error and click outside the editor to retry.', 'warn');
+      return false;
+    } finally {
+      syncInFlightPromise = null;
+      syncInFlightText = null;
+    }
+  })();
+  return syncInFlightPromise;
+}
+
+// Re-validate as soon as the user leaves the CIF editor (click elsewhere,
+// tab away, etc.), not just when switching tabs. This keeps the backend
+// session model in sync with what's on screen instead of silently working
+// off the pre-edit version.
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('modelEditor').addEventListener('blur', () => {
+    syncModelFromEditor({ blocking: false });
+  });
+});
+
 // Patch switchTab to call the hooks.
 // switchTab is now async: leaving tab1 validates the CIF first.
 const _switchTabOrig = switchTab;
@@ -2228,36 +2330,8 @@ switchTab = async function(n) {
 
   // Leaving tab 1: validate the CIF editor content before allowing the switch
   if (prevId === 'tab1') {
-    const cif_text = document.getElementById('modelEditor').value.trim();
-    if (!cif_text) {
-      log('Cannot switch tab: model editor is empty.', 'err');
-      return;
-    }
-    if (!sessionId) {
-      log('Cannot switch tab: no session. Load a .cif file first.', 'err');
-      return;
-    }
-    // Show inline validation state in the status bar
-    document.getElementById('slModelTxt').textContent = 'Validating…';
-    try {
-      const data = await api('POST', `/model/${sessionId}/validate`, { cif_text });
-      // Update status with fresh model info
-      bondsCount = data.bonds.length;
-      document.getElementById('slModelTxt').textContent =
-        'Model OK — ' + data.num_atoms + ' atoms, ' + data.cell_size + ' sites';
-      document.getElementById('slBondsTxt').textContent =
-        bondsCount > 0 ? bondsCount + ' bond type(s)' : 'No bonds';
-      document.getElementById('slModel').classList.add('ok');
-      log('Model validated. atoms=' + data.num_atoms
-          + '  cell_size=' + data.cell_size
-          + '  bonds=' + bondsCount);
-    } catch(e) {
-      // api() already logged the error; keep user on tab 1
-      document.getElementById('slModelTxt').textContent = 'Invalid model';
-      document.getElementById('slModel').classList.remove('ok');
-      document.getElementById('slModel').classList.add('err');
-      return;   // ← block the tab switch
-    }
+    const ok = await syncModelFromEditor({ blocking: true });
+    if (!ok) return;   // ← block the tab switch
   }
 
   onLeaveTab(prevId);
