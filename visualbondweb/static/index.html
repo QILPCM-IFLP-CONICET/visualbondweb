@@ -1135,6 +1135,11 @@
           <div style="margin-top:4px;font-size:11px;color:var(--text3)">or click to browse</div>
         </div>
         <input type="file" id="fileInput" accept=".cif,.struct" style="display:none" onchange="loadFile(this)">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text2)" title="Keep only the atoms declared in the CIF's asymmetric unit (never expand them) using a primitive Bravais basis. Only works if the CIF's symmetry operators are pure translations (a centered lattice: F, I, C, A or B).">
+          <input type="checkbox" id="primitiveCellCheckbox" onchange="togglePrimitiveCell(this)">
+          Use primitive cell (centering symmetries)
+        </label>
+	
       </div>
     </div>
 
@@ -1751,8 +1756,10 @@ async function loadFileHidden(input) {
   if (!file) return;
   log('Uploading ' + file.name + ' to server...');
   setLoading('tabbar', true);
+    const usePrimitive = document.getElementById('primitiveCellCheckbox').checked;    
   const form = new FormData();
   form.append('file', file);
+  form.append('primitive_cell', usePrimitive)    
   try {
     const data = await api('POST', '/model/upload', form, true);
     sessionId   = data.session_id;
@@ -1762,11 +1769,17 @@ async function loadFileHidden(input) {
     document.getElementById('modelEditor').value = modelText;
     lastSyncedCifText = modelText.trim();
     document.getElementById('fileNamePill').textContent = file.name;
-    document.getElementById('modelStat').textContent = modelText.split('\n').length + ' lines';
+      document.getElementById('modelStat').textContent = modelText.split('\n').length + ' lines';
+    // The server may have ignored primitive_cell (e.g. no centering
+    // symmetries to reduce, or nothing declared in the CIF); reflect
+    // what actually happened rather than what was requested.
+    document.getElementById('primitiveCellCheckbox').checked = !!data.primitive_cell;
+      
     enableTabs();
     updateStatus();
     log('Model loaded: ' + file.name);
-    log('Atoms: ' + data.num_atoms + '  Cell size: ' + data.cell_size + '  Bonds: ' + bondsCount);
+    log('Atoms: ' + data.num_atoms + '  Cell size: ' + data.cell_size + '  Bonds: ' + bondsCount
+        + (data.space_group_symbol ? '  Space group: ' + data.space_group_symbol : ''));
     setConfigsText('');  // reset configs when a new model is loaded
   } catch(e) {
     // error already logged
@@ -1778,6 +1791,33 @@ async function loadFileHidden(input) {
 
 function loadFile(input) { loadFileHidden(input); }
 
+
+ 
+// ── Primitive cell toggle ──
+async function togglePrimitiveCell(checkbox) {
+  if (!modelLoaded || !sessionId) return;  // nothing loaded yet: just remember the choice for the next upload
+  const wanted = checkbox.checked;
+  log('Switching to ' + (wanted ? 'primitive' : 'conventional') + ' cell representation...');
+  try {
+    const data = await api('POST', '/model/' + sessionId + '/primitive_cell', { primitive_cell: wanted });
+    modelText = data.cif_text;
+    document.getElementById('modelEditor').value = modelText;
+    document.getElementById('modelStat').textContent = modelText.split('\n').length + ' lines';
+    checkbox.checked = !!data.primitive_cell;
+    updateStatus();
+    log('Atoms: ' + data.num_atoms + '  Cell size: ' + data.cell_size
+        + (data.space_group_symbol ? '  Space group: ' + data.space_group_symbol : ''));
+    if (wanted && !data.primitive_cell) {
+      log('Could not reduce to a primitive cell (see log/status above for why); kept the conventional cell.', 'err');
+    }
+  } catch(e) {
+    // revert the checkbox if the request failed (e.g. non-translational symmetries)
+    checkbox.checked = !wanted;
+  }
+}
+
+
+  
 // ── Page 1 actions ──
 async function addBonds() {
   if (!modelLoaded) { log('Error: no model loaded.', 'err'); return; }
@@ -2290,10 +2330,13 @@ async function syncModelFromEditor({ blocking = false } = {}) {
         bondsCount > 0 ? bondsCount + ' bond type(s)' : 'No bonds';
       document.getElementById('slModel').classList.remove('err');
       document.getElementById('slModel').classList.add('ok');
+      document.getElementById('primitiveCellCheckbox').checked = !!data.primitive_cell;
       lastSyncedCifText = cif_text;
       log('Model validated. atoms=' + data.num_atoms
           + '  cell_size=' + data.cell_size
-          + '  bonds=' + bondsCount);
+          + '  bonds=' + bondsCount
+          + (data.space_group_symbol ? '  space_group=' + data.space_group_symbol : ''));
+	
       return true;
     } catch (e) {
       // api() already logged the error detail; add the practical consequence.
