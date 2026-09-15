@@ -8,6 +8,14 @@ Note: there are currently two near-identical copies of the backend —
 installed by `pip install .`, per `pyproject.toml`). Keep changes to both
 in sync until they're unified into a single module.
 
+## Frontend
+
+The web UI (`visualbondweb/static/index.html`) has a **"Use primitive
+cell (centering symmetries)"** checkbox next to the file upload zone on
+Tab 1, and in-app documentation for it under **Help → Loading a model
+file → Primitive cell** (`visualbondweb/static/help.html`). It mirrors
+the `primitive_cell` API field/endpoint described below.
+
 ## API overview
 
 Interactive docs (generated from the endpoint docstrings) are available

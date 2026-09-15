@@ -572,6 +572,7 @@
       <div class="nav-section-label">Tabs</div>
       <a class="nav-link" href="#tab1"><span class="nav-icon">1</span> Define Model</a>
       <a class="nav-link nav-sub" href="#tab1-load">Loading a file</a>
+      <a class="nav-link nav-sub" href="#tab1-primitive">Primitive cell</a>
       <a class="nav-link nav-sub" href="#tab1-bonds">Adding bonds</a>
       <a class="nav-link nav-sub" href="#tab1-lattice">Growing the lattice</a>
       <a class="nav-link nav-sub" href="#tab1-editor">CIF editor</a>
@@ -747,6 +748,57 @@
         <div class="callout info">
           <span class="callout-icon">ℹ</span>
           <span>If you upload a <code>.struct</code> file, Visualbond converts it to CIF internally. The editor always shows the CIF representation.</span>
+        </div>
+
+        <h3 id="tab1-primitive">Primitive cell</h3>
+        <p>Next to the upload zone there's a checkbox: <strong>Use primitive cell (centering
+        symmetries)</strong>. It controls how Visualbond handles CIFs whose symmetry loop
+        declares extra operators for a <em>centered</em> Bravais lattice (F, I, C, A or B
+        — for example, the face-centered cubic structure of a spinel like ZnCr₂O₄).</p>
+
+        <table class="field-table">
+          <tr><th>Setting</th><th>Behavior</th></tr>
+          <tr>
+            <td class="field-name">Off (default)</td>
+            <td class="field-desc">The atoms of the CIF's asymmetric unit are expanded to fill the
+            conventional cell (e.g. 16 atoms for an F-centered spinel with 4 atoms per
+            asymmetric unit). This matches Visualbond's historical behavior.</td>
+          </tr>
+          <tr>
+            <td class="field-name">On</td>
+            <td class="field-desc">Atoms are kept exactly as declared in the CIF (never
+            expanded), and the model's unit cell is switched to the smallest possible
+            (primitive) one — for the F-centered example above, this means 4 atoms instead
+            of 16. Useful when enumerating spin configurations, since fewer sites means a
+            much smaller search space.</td>
+          </tr>
+        </table>
+
+        <p>You can toggle this at any point, not just before loading a file: if a model is
+        already open, changing the checkbox re-parses the current CIF in place and updates
+        the editor and status bar immediately.</p>
+
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <span><strong>This only works while the CIF still declares the centering symmetry
+          operators explicitly.</strong> Turning the checkbox on for a CIF that lists no
+          symmetry beyond the identity (space group P1) has nothing to reduce, and Visualbond
+          will just keep it as-is. In particular, if you load a compact (primitive-cell) model,
+          then <strong>save</strong> it, then re-open that saved file with the checkbox
+          <em>off</em>, the centering information is not recoverable afterwards from that file
+          alone — you'd need to go back to the original CIF (or reconstruct one) with the
+          symmetry operators still listed. If in doubt, keep the checkbox in the state you
+          want <em>before</em> your first upload, and avoid switching it off and back on
+          across a save/reload.</span>
+        </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ</span>
+          <span>Turning the checkbox on only has an effect if every symmetry operator in
+          the CIF is a pure translation (no rotations) — this is what "centering" means
+          crystallographically. If the CIF's symmetry loop includes point-group rotations,
+          the request is rejected with an error explaining why, and the checkbox reverts to
+          its previous state.</span>
         </div>
 
         <h3 id="tab1-bonds">Adding bonds</h3>
