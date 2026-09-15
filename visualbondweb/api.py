@@ -233,7 +233,7 @@ async def upload_model(file: UploadFile = File(...)):
     tmp.write_bytes(content)
 
     try:
-        model = magnetic_model_from_file(filename=str(tmp))
+        model = magnetic_model_from_file(filename=str(tmp), primitive_cell=True)
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=f"Cannot parse model: {exc}")
@@ -286,7 +286,7 @@ async def update_model_cif(session_id: str, file: UploadFile = File(...)):
     tmp = TMPDIR / f"{uuid.uuid4()}.cif"
     tmp.write_text(content)
     try:
-        model = magnetic_model_from_file(filename=str(tmp))
+        model = magnetic_model_from_file(filename=str(tmp),  primitive_cell=True)
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=f"Cannot parse updated CIF: {exc}")
@@ -313,7 +313,7 @@ def validate_and_update_cif(session_id: str, req: ValidateCifRequest):
     tmp = TMPDIR / f"{uuid.uuid4()}.cif"
     tmp.write_text(req.cif_text)
     try:
-        model = magnetic_model_from_file(filename=str(tmp))
+        model = magnetic_model_from_file(filename=str(tmp),  primitive_cell=True)
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=str(exc))
