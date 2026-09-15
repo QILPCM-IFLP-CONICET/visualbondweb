@@ -16,7 +16,7 @@ if not hasattr(np, 'Infinity'):
     np.Infinity = np.inf
 # ─────────────────────────────────────────────────────────────────────────────
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -201,7 +201,12 @@ def health():
 def new_session():
     """Create a new empty session, return its ID."""
     sid = str(uuid.uuid4())
-    sessions[sid] = {"model": None, "cif_path": None, "configurations": ([], [], [])}
+    sessions[sid] = {
+        "model": None,
+        "cif_path": None,
+        "configurations": ([], [], []),
+        "primitive_cell": False,
+    }
     return {"session_id": sid}
 
 
@@ -218,10 +223,22 @@ def delete_session(session_id: str):
 # ── Model loading ─────────────────────────────────────────────────────────────
 
 @app.post("/model/upload")
-async def upload_model(file: UploadFile = File(...)):
+async def upload_model(
+    file: UploadFile = File(...),
+    primitive_cell: bool = Form(False),
+):
     """
     Upload a .cif or .struct file.
     Returns session_id + the CIF text of the parsed model.
+
+    `primitive_cell`: if True (only meaningful for CIFs whose symmetry
+    loop lists pure-translation centering operators, e.g. F-centered
+    lattices), atoms are kept exactly as declared in the CIF's
+    asymmetric unit instead of being expanded to fill the conventional
+    cell. This setting is remembered for the session: every later call
+    that reloads this model (`/model/{id}/cif`, `/model/{id}/validate`)
+    reuses it automatically, so the compact representation is never
+    silently lost on a round-trip.
     """
     suffix = Path(file.filename).suffix.lower()
     if suffix not in (".cif", ".struct"):
@@ -233,7 +250,7 @@ async def upload_model(file: UploadFile = File(...)):
     tmp.write_bytes(content)
 
     try:
-        model = magnetic_model_from_file(filename=str(tmp), primitive_cell=True)
+        model = magnetic_model_from_file(filename=str(tmp), primitive_cell=primitive_cell)
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=f"Cannot parse model: {exc}")
@@ -249,6 +266,7 @@ async def upload_model(file: UploadFile = File(...)):
         "model": model,
         "cif_path": cif_path,
         "configurations": ([], [], []),
+        "primitive_cell": primitive_cell,
     }
     tmp.unlink(missing_ok=True)
 
@@ -265,6 +283,8 @@ async def upload_model(file: UploadFile = File(...)):
         "cif_text": cif_text,
         "num_atoms": num_atoms,
         "cell_size": model.lattice_properties.get("cell_size", 0),
+        "primitive_cell": primitive_cell,
+        "space_group_symbol": model.lattice_properties.get("space_group_symbol"),
         "bonds": bonds_info,
     }
 
@@ -286,7 +306,9 @@ async def update_model_cif(session_id: str, file: UploadFile = File(...)):
     tmp = TMPDIR / f"{uuid.uuid4()}.cif"
     tmp.write_text(content)
     try:
-        model = magnetic_model_from_file(filename=str(tmp),  primitive_cell=True)
+        model = magnetic_model_from_file(
+            filename=str(tmp), primitive_cell=sess.get("primitive_cell", False)
+        )
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=f"Cannot parse updated CIF: {exc}")
@@ -295,7 +317,11 @@ async def update_model_cif(session_id: str, file: UploadFile = File(...)):
     model.save_cif(str(tmp))
     sess["model"] = model
     sess["cif_path"] = str(tmp)
-    return {"status": "updated", "cell_size": model.lattice_properties.get("cell_size")}
+    return {
+        "status": "updated",
+        "cell_size": model.lattice_properties.get("cell_size"),
+        "primitive_cell": sess.get("primitive_cell", False),
+    }
 
 
 class ValidateCifRequest(BaseModel):
@@ -308,12 +334,19 @@ def validate_and_update_cif(session_id: str, req: ValidateCifRequest):
     Validate the CIF text from the editor and update the session model.
     Called when the user leaves tab 1. Returns model info on success,
     or raises 422 with a human-readable detail on parse failure.
+
+    Reuses the session's `primitive_cell` setting (set at upload time,
+    or via `/model/{session_id}/primitive_cell`) so hand-edits made in
+    the text editor don't silently fall back to the expanded/conventional
+    representation.
     """
     sess = _get_session(session_id)
     tmp = TMPDIR / f"{uuid.uuid4()}.cif"
     tmp.write_text(req.cif_text)
     try:
-        model = magnetic_model_from_file(filename=str(tmp),  primitive_cell=True)
+        model = magnetic_model_from_file(
+            filename=str(tmp), primitive_cell=sess.get("primitive_cell", False)
+        )
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=str(exc))
@@ -328,7 +361,55 @@ def validate_and_update_cif(session_id: str, req: ValidateCifRequest):
         "status": "ok",
         "num_atoms": num_atoms,
         "cell_size": model.lattice_properties.get("cell_size", 0),
+        "primitive_cell": sess.get("primitive_cell", False),
+        "space_group_symbol": model.lattice_properties.get("space_group_symbol"),
         "bonds": bonds_info,
+    }
+
+
+class PrimitiveCellRequest(BaseModel):
+    primitive_cell: bool
+
+
+@app.post("/model/{session_id}/primitive_cell")
+def set_primitive_cell(session_id: str, req: PrimitiveCellRequest):
+    """
+    Change the session's primitive_cell setting and immediately re-parse
+    the current CIF with it. Lets the frontend toggle between the
+    expanded (conventional cell) and compact (primitive cell) views
+    without losing track of which one is active.
+
+    Note: this can only recover the compact form if the CIF currently
+    held by the session still declares the centering symmetry operators
+    explicitly (e.g. it hasn't already been through a save/reload cycle
+    with primitive_cell=False, which bakes in the fully expanded, P1
+    form and discards the information needed to reduce it again).
+    """
+    sess = _get_session(session_id)
+    if not sess["cif_path"] or not Path(sess["cif_path"]).exists():
+        raise HTTPException(status_code=404, detail="No CIF file for this session.")
+    cif_text = Path(sess["cif_path"]).read_text()
+    tmp = TMPDIR / f"{uuid.uuid4()}.cif"
+    tmp.write_text(cif_text)
+    try:
+        model = magnetic_model_from_file(
+            filename=str(tmp), primitive_cell=req.primitive_cell
+        )
+    except Exception as exc:
+        tmp.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=str(exc))
+    Path(sess["cif_path"]).unlink(missing_ok=True)
+    model.save_cif(str(tmp))
+    sess["model"] = model
+    sess["cif_path"] = str(tmp)
+    sess["primitive_cell"] = req.primitive_cell
+    return {
+        "status": "ok",
+        "primitive_cell": req.primitive_cell,
+        "num_atoms": len(model.site_properties.get("coord_atomos", [])),
+        "cell_size": model.lattice_properties.get("cell_size", 0),
+        "space_group_symbol": model.lattice_properties.get("space_group_symbol"),
+        "cif_text": Path(sess["cif_path"]).read_text(),
     }
 
 
