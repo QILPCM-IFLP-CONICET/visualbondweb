@@ -1083,6 +1083,41 @@
   <div class="page active" id="page1">
 
     <div class="p1-sidebar">
+      <!-- Load -->
+      <div class="panel-label">Load</div>
+      <div class="section-block">
+        <div class="upload-zone" onclick="triggerOpen()">
+          <div class="upload-icon">⬡</div>
+          <div>Drop .cif / .struct here</div>
+          <div style="margin-top:4px;font-size:11px;color:var(--text3)">or click to browse</div>
+        </div>
+        <input type="file" id="fileInput" accept=".cif,.struct" style="display:none" onchange="loadFile(this)">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text2)" title="Keep only the atoms declared in the CIF's asymmetric unit (never expand them) using a Bravais basis. Only works if the CIF's symmetry operators are pure translations (a centered lattice: F, I, C, A or B).">
+          <input type="checkbox" checked="checked" id="primitiveCellCheckbox" onchange="togglePrimitiveCell(this)">
+          Use primitive cell (centering symmetries)
+	  <button class="help-btn" onclick="showHelpPopover(this,'primcell')">?</button>
+        </label>
+	
+      </div>      
+      <!-- Grow Lattice: controls supercell_size for generate_bonds -->
+      <div class="panel-label">Grow lattice <button class="help-btn" style="margin-left:4px" onclick="showHelpPopover(this,'supercell')">?</button></div>
+      <div class="section-block">
+        <div class="field-row">
+          <span class="field-label">Lx:</span>
+          <input type="number" id="p1-lx" value="1" min="1" step="1">
+        </div>
+        <div class="field-row">
+          <span class="field-label">Ly:</span>
+          <input type="number" id="p1-ly" value="1" min="1" step="1">
+        </div>
+        <div class="field-row">
+          <span class="field-label">Lz:</span>
+          <input type="number" id="p1-lz" value="1" min="1" step="1">
+        </div>
+        <button class="btn btn-full" onclick="addBonds()">
+          ↗ Apply &amp; grow
+        </button>
+      </div>
       <!-- Add Bonds -->
       <div class="panel-label">Add bonds</div>
       <div class="section-block">
@@ -1104,43 +1139,6 @@
         <button class="btn primary btn-full" onclick="addBonds()">
           ⬡ Add bonds
         </button>
-      </div>
-
-      <!-- Grow Lattice: controls supercell_size for generate_bonds -->
-      <div class="panel-label">Grow lattice <button class="help-btn" style="margin-left:4px" onclick="showHelpPopover(this,'supercell')">?</button></div>
-      <div class="section-block">
-        <div class="field-row">
-          <span class="field-label">Lx:</span>
-          <input type="number" id="p1-lx" value="1" min="1" step="1">
-        </div>
-        <div class="field-row">
-          <span class="field-label">Ly:</span>
-          <input type="number" id="p1-ly" value="1" min="1" step="1">
-        </div>
-        <div class="field-row">
-          <span class="field-label">Lz:</span>
-          <input type="number" id="p1-lz" value="1" min="1" step="1">
-        </div>
-        <button class="btn btn-full" onclick="addBonds()">
-          ↗ Apply &amp; grow
-        </button>
-      </div>
-
-      <!-- Load -->
-      <div class="panel-label">Load</div>
-      <div class="section-block">
-        <div class="upload-zone" onclick="triggerOpen()">
-          <div class="upload-icon">⬡</div>
-          <div>Drop .cif / .struct here</div>
-          <div style="margin-top:4px;font-size:11px;color:var(--text3)">or click to browse</div>
-        </div>
-        <input type="file" id="fileInput" accept=".cif,.struct" style="display:none" onchange="loadFile(this)">
-        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text2)" title="Keep only the atoms declared in the CIF's asymmetric unit (never expand them) using a Bravais basis. Only works if the CIF's symmetry operators are pure translations (a centered lattice: F, I, C, A or B).">
-          <input type="checkbox" checked="checked" id="primitiveCellCheckbox" onchange="togglePrimitiveCell(this)">
-          Use primitive cell (centering symmetries)
-	  <button class="help-btn" onclick="showHelpPopover(this,'primcell')">?</button>
-        </label>
-	
       </div>
     </div>
 
@@ -1495,7 +1493,22 @@
         <span>ℹ</span>
         <span>Navigating to Tab 2 triggers a silent CIF validation. If the file cannot be parsed the tab switch is blocked.</span>
       </div>
+      <h3>Use primitive cell (centering symmetries)</h3>
+      <p>When the CIF contains explicit centering-symmetry operators for a conventional cell, this option controls how Visualbond interprets the structure. With the checkbox enabled (the default), the atoms are kept exactly as declared in the CIF and the unit cell is reduced to the smallest primitive cell compatible with the lattice centering. With the checkbox disabled, the asymmetric unit is expanded to the full conventional cell by adding the missing atoms.
+</p>
+      <div class="help-callout tip">
+        <span>✦</span>
+        <span>This is especially useful for centered lattices such as F, I, C, A, or B. Enabling the option reduces the number of sites and therefore the search space when enumerating spin configurations.Disabling it allows configurations that break the cell symmetry, but it requires working with more atoms.</span>
+      </div>
 
+      <h3>Grow lattice (supercell)</h3>
+      <p>Lx / Ly / Lz expand the primitive cell before bond generation. Use a supercell when spin configurations span more than one unit cell.</p>
+      <div class="help-callout tip">
+        <span>✦</span>
+        <span>Start with 1×1×1. Enlarge only if the optimizer reports a poor condition number after generating configurations.</span>
+      </div>
+
+      
       <h3>Add bonds parameters</h3>
       <table class="help-param-table">
         <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
@@ -1513,21 +1526,7 @@
         </tr>
       </table>
 
-      <h3>Grow lattice (supercell)</h3>
-      <p>Lx / Ly / Lz expand the primitive cell before bond generation. Use a supercell when spin configurations span more than one unit cell.</p>
-      <div class="help-callout tip">
-        <span>✦</span>
-        <span>Start with 1×1×1. Enlarge only if the optimizer reports a poor condition number after generating configurations.</span>
-      </div>
 
-      <h3>Use primitive cell (centering symmetries)</h3>
-      <p>When a file has an incomplete unit cell and explicit unit cell symmetries (conventional cell), this checkbox decides if keep the original atoms and work with a minimal primitive cell (when the checkbox is activated, the default behavior), or to complete the cell by adding the missing atoms using the symmetry (when the checkbox is deactivated).</p>
-      <div class="help-callout tip">
-        <span>✦</span>
-        <span>Deactivate it allows to consider spin configurations that break the cell symmetries, but requires to work with more atoms.</span>
-      </div>
-      
-      
     </div>
 
     <!-- ── Tab 2 ── -->
@@ -2494,8 +2493,8 @@ const HELP_TIPS = {
   },
   primcell: {
       label: 'Use primitive cell(centering symmetries)',
-      def: 'Default: True',
-      text: 'If the file establishes some cell symmetries, "True" atoms are kept as declared, and the unit cell is rewritten as the smallest posible primitive. If "False", asymmetric cells are expanded to complete the conventional cell by adding the missing atoms.',
+      def: 'Default: Enabled',
+      text: 'If the CIF contains centering symmetry operators, enabling this option keeps the atoms exactly as declared and rewrites the unit cell to the smallest primitive cell compatible with that symmetry. Disabling it expands the asymmetric unit to the conventional cell by adding the missing atoms.',
       section: 'tab1'
   },
   nconf: {
