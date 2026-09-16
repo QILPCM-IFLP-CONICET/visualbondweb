@@ -489,7 +489,7 @@ def optimize_configs(req: OptimizeConfigsRequest):
         lines.append(f"nan\t{_fmt_conf(nc)}\t\t# {new_labels[i]}")
 
     return {
-        "condition_number": float(cn),
+        "condition_number": str(cn),
         "new_configs_text": "\n".join(lines),
         "num_new_configs": len(newconfs),
     }
@@ -520,7 +520,7 @@ def optimal_independent_set(req: OptimalIndepSetRequest):
         lines.append(f"# {_fmt_conf(nc)}\t\t# {new_labels[i]}")
 
     return {
-        "condition_number": float(cn),
+        "condition_number": str(cn),
         "subset_text": "\n".join(lines),
         "num_configs": len(newconfs),
     }
@@ -559,7 +559,7 @@ def get_equations(req: EquationsRequest):
     cost = model.cost(confs)
     equations += f"\n\n|ΔJ|/|ΔE| < {cost:.4g}"
 
-    return {"equations": equations, "condition_number": float(cost)}
+    return {"equations": equations, "condition_number": str(cost)}
 
 
 # ── Evaluate couplings ────────────────────────────────────────────────────────
