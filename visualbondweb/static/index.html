@@ -1135,9 +1135,10 @@
           <div style="margin-top:4px;font-size:11px;color:var(--text3)">or click to browse</div>
         </div>
         <input type="file" id="fileInput" accept=".cif,.struct" style="display:none" onchange="loadFile(this)">
-        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text2)" title="Keep only the atoms declared in the CIF's asymmetric unit (never expand them) using a primitive Bravais basis. Only works if the CIF's symmetry operators are pure translations (a centered lattice: F, I, C, A or B).">
-          <input type="checkbox" id="primitiveCellCheckbox" onchange="togglePrimitiveCell(this)">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--text2)" title="Keep only the atoms declared in the CIF's asymmetric unit (never expand them) using a Bravais basis. Only works if the CIF's symmetry operators are pure translations (a centered lattice: F, I, C, A or B).">
+          <input type="checkbox" checked="checked" id="primitiveCellCheckbox" onchange="togglePrimitiveCell(this)">
           Use primitive cell (centering symmetries)
+	  <button class="help-btn" onclick="showHelpPopover(this,'primcell')">?</button>
         </label>
 	
       </div>
@@ -1518,6 +1519,15 @@
         <span>✦</span>
         <span>Start with 1×1×1. Enlarge only if the optimizer reports a poor condition number after generating configurations.</span>
       </div>
+
+      <h3>Use primitive cell (centering symmetries)</h3>
+      <p>When a file has an incomplete unit cell and explicit unit cell symmetries (conventional cell), this checkbox decides if keep the original atoms and work with a minimal primitive cell (when the checkbox is activated, the default behavior), or to complete the cell by adding the missing atoms using the symmetry (when the checkbox is deactivated).</p>
+      <div class="help-callout tip">
+        <span>✦</span>
+        <span>Deactivate it allows to consider spin configurations that break the cell symmetries, but requires to work with more atoms.</span>
+      </div>
+      
+      
     </div>
 
     <!-- ── Tab 2 ── -->
@@ -2481,6 +2491,12 @@ const HELP_TIPS = {
     def: 'Default: 1×1×1',
     text: 'Expands the primitive cell before bond generation. Use a supercell when configurations must span more than one unit cell.',
     section: 'tab1'
+  },
+  primcell: {
+      label: 'Use primitive cell(centering symmetries)',
+      def: 'Default: True',
+      text: 'If the file establishes some cell symmetries, "True" atoms are kept as declared, and the unit cell is rewritten as the smallest posible primitive. If "False", asymmetric cells are expanded to complete the conventional cell by adding the missing atoms.',
+      section: 'tab1'
   },
   nconf: {
     label: 'Num. configs',
