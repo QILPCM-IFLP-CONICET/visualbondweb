@@ -686,7 +686,7 @@ def parse_configs(req: EquationsRequest):
         "with_energy": known,
         "without_energy": len(confs) - known,
         "configs": [
-            {"energy": e, "config": c, "label": l}
+            {"energy": str(e), "config": c, "label": l}
             for e, c, l in zip(energies, confs, labels)
         ],
     }

@@ -521,7 +521,6 @@ def optimal_independent_set(req: OptimalIndepSetRequest):
     lines = [f"\n# Optimal independent subset. sqrt(l)/||A^-1|| = {cn:.4g}:"]
     for i, nc in enumerate(newconfs):
         lines.append(f"# {_fmt_conf(nc)}\t\t# {new_labels[i]}")
-
     return {
         "condition_number": str(cn),
         "subset_text": "\n".join(lines),
@@ -693,7 +692,7 @@ def parse_configs(req: EquationsRequest):
         "with_energy": known,
         "without_energy": len(confs) - known,
         "configs": [
-            {"energy": e, "config": c, "label": l}
+            {"energy": str(e), "config": c, "label": l}
             for e, c, l in zip(energies, confs, labels)
         ],
     }
