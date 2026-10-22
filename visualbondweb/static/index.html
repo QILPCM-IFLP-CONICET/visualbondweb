@@ -1258,14 +1258,17 @@
       <div class="panel-label">Error bound method <button class="help-btn" style="margin-left:4px" onclick="showHelpPopover(this,'errmethod')">?</button></div>
       <div class="section-block">
         <div class="radio-group">
-          <label class="radio-row">
-            <input type="radio" name="errmethod" value="quad" onchange="toggleMcParams(false)"> Quadratic bound
-          </label>
           <label class="radio-row active">
-            <input type="radio" name="errmethod" value="mc" checked onchange="toggleMcParams(true)"> Monte Carlo
+            <input type="radio" name="errmethod" value="exact" checked onchange="updateErrMethod()"> Exact box
+          </label>
+          <label class="radio-row">
+            <input type="radio" name="errmethod" value="montecarlo" onchange="updateErrMethod()"> Monte Carlo
+          </label>
+          <label class="radio-row">
+            <input type="radio" name="errmethod" value="ellipse" onchange="updateErrMethod()"> Quadratic bound
           </label>
         </div>
-        <div class="mc-params" id="mcParams">
+        <div class="mc-params hidden" id="mcParams">
           <div class="field-row">
             <span class="field-label">Num. samples:</span>
             <input type="number" id="p3-mcsteps" value="1000" step="100">
@@ -1573,15 +1576,16 @@
       <h3>Error bound method</h3>
       <table class="help-param-table">
         <tr><th>Method</th><th>Description</th></tr>
-        <tr><td class="pname">Quadratic</td><td>Analytic upper bound — fast, conservative.</td></tr>
-        <tr><td class="pname">Monte Carlo</td><td>Samples random energy perturbations within the tolerance. More realistic. Recommended for final results.</td></tr>
+        <tr><td class="pname">Exact box</td><td>Exact bounding box of the compatibility region, by linear programming. Recommended.</td></tr>
+        <tr><td class="pname">Monte Carlo</td><td>Samples the region at random. Inner estimate: never larger than the exact box.</td></tr>
+        <tr><td class="pname">Quadratic</td><td>Box of an ellipsoid containing the region. Outer estimate: never smaller than the exact box.</td></tr>
       </table>
 
       <h3>Monte Carlo parameters</h3>
       <table class="help-param-table">
         <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
-        <tr><td class="pname">Num. samples</td><td class="pdef">1000</td><td>Random perturbation samples. Use 5000–10000 for publication results.</td></tr>
-        <tr><td class="pname">Size factor</td><td class="pdef">1.0</td><td>Scales perturbation amplitude relative to energy tolerance. Keep at 1.0.</td></tr>
+        <tr><td class="pname">Num. samples</td><td class="pdef">1000</td><td>Points sampled in an ellipsoid containing the region.</td></tr>
+        <tr><td class="pname">Size factor</td><td class="pdef">1.0</td><td>Scale of the sampling ellipsoid. Keep at 1.0.</td></tr>
       </table>
 
       <h3>Reading results</h3>
@@ -1598,7 +1602,7 @@
       <p>The total energy for a collinear spin configuration <strong>σ</strong> is written as:</p>
       <div class="help-eq">
         <span class="eq-e">E(<strong>σ</strong>)</span> = E₀ + Σ<sub>k</sub> <span class="eq-j">J<sub>k</sub></span> <span class="eq-a">A<sub>k</sub>(<strong>σ</strong>)</span><br>
-        <span class="eq-c"># A_k(σ) = antiparallel pairs of bond type k in σ</span>
+        <span class="eq-c"># A_k(σ) = −Σ s_i s_j over bonds of type k, s_i = ±1 (antiparallel pairs − parallel pairs)</span>
       </div>
       <p>Computing M configurations gives the linear system <strong>A·J = E</strong>, solved by least squares.</p>
 
@@ -1606,9 +1610,11 @@
       <p>The optimizer minimizes the condition number κ(<strong>A</strong>) using a greedy search: at each step it picks the candidate configuration (from a random pool of size <em>bunch</em>) that most reduces κ. A smaller κ means the ratio |ΔJ|/|ΔE| is smaller — more accurate J values for the same DFT precision.</p>
 
       <h3>Error bounds</h3>
-      <p><strong>Quadratic:</strong> δJ ≤ ‖A⁺‖ · δE — analytic, always valid, conservative.</p>
-      <p><strong>Monte Carlo:</strong> std(J) over N samples of E + Uniform(−δE, +δE) — more realistic estimate.</p>
-      <p>A <strong>negative</strong> error bound means the system is incompatible: the data cannot be reproduced by any J within ±δE of the input energies.</p>
+      <p>The <em>compatibility region</em> is the set of couplings that reproduce every energy within the tolerance: { <strong>J</strong> : max<sub>i</sub> |(<strong>A·J</strong> − <strong>E</strong>)<sub>i</sub>| ≤ δE }. It is a polytope, and the reported J ± δJ is a box around it.</p>
+      <p><strong>Exact box:</strong> min and max of each J<sub>k</sub> over the region, by linear programming. Exact and deterministic.</p>
+      <p><strong>Monte Carlo:</strong> points drawn uniformly in the ellipsoid |<strong>A</strong>(<strong>J</strong> − <strong>J</strong><sub>LS</sub>)|² ≤ MδE² − |<strong>r</strong>|², which contains the region, keeping those inside it. Underestimates the box, more so with many couplings.</p>
+      <p><strong>Quadratic:</strong> bounding box of that ellipsoid. Overestimates the box.</p>
+      <p>A <strong>negative</strong> error bound means the system is incompatible: the data cannot be reproduced by any J within ±δE of the input energies. A coupling the configurations do not determine is shown as such.</p>
     </div>
 
     <!-- ── Citation ── -->
@@ -1932,25 +1938,28 @@ async function syncAndParseConfigs() {
 }
 
 // ── Page 3 actions ──
-function toggleMcParams(on) {
-  document.getElementById('mcParams').classList.toggle('hidden', !on);
+function updateErrMethod() {
+  const method = document.querySelector('input[name="errmethod"]:checked').value;
+  document.querySelectorAll('input[name="errmethod"]').forEach(r =>
+    r.closest('.radio-row').classList.toggle('active', r.checked));
+  document.getElementById('mcParams').classList.toggle('hidden', method !== 'montecarlo');
 }
 
 async function estimateParameters() {
   if (!modelLoaded) { log('Error: no model loaded.', 'err'); return; }
   const tol    = parseFloat(document.getElementById('p3-tol').value);
-  const usemc  = document.querySelector('input[name="errmethod"]:checked').value === 'mc';
+  const method = document.querySelector('input[name="errmethod"]:checked').value;
   const steps  = parseInt(document.getElementById('p3-mcsteps').value);
   const factor = parseFloat(document.getElementById('p3-mcfactor').value);
   const fmt    = document.getElementById('p3-format').value;
   const text   = document.getElementById('energyEditor').value;
-  log('evaluate_cc: tolerance=' + tol + ' montecarlo=' + usemc);
+  log('evaluate_cc: tolerance=' + tol + ' method=' + method);
   try {
     const data = await api('POST', '/evaluate', {
       session_id: sessionId,
       configs_text: text,
       energy_tolerance: tol,
-      use_montecarlo: usemc,
+      method: method,
       mc_steps: steps,
       mc_size_factor: factor,
       output_format: fmt
@@ -1963,6 +1972,13 @@ async function estimateParameters() {
     data.parameters.forEach(p => {
       const card = document.createElement('div');
       card.className = 'param-card' + (p.incompatible ? ' incompatible' : '');
+      if (p.undetermined) {
+        card.innerHTML = '<span class="param-name">' + p.name + '</span>'
+          + '<span class="param-val">—</span>'
+          + '<span class="param-err">not determined by these configurations</span>';
+        cards.appendChild(card);
+        return;
+      }
       const valStr = p.value !== null ? (p.value >= 0 ? '+' : '') + p.value.toExponential(4) : '—';
       const errStr = p.error !== null ? '± ' + Math.abs(p.error).toExponential(3) : '';
       const normStr = (p.value_normalized !== undefined)
@@ -1977,6 +1993,12 @@ async function estimateParameters() {
     window._lastChiData = { chis: data.chis, labels: data.chi_labels };
     renderChiChart(data.chis, data.chi_labels);
     const incompMsg = data.incompatible ? ' ⚠ Incompatible model!' : '';
+    const undet = data.parameters.filter(p => p.undetermined).map(p => p.name);
+    if (undet.length) log('Warning: ' + undet.join(', ') + ' not determined by the configurations with known energies.', 'warn');
+    if (data.acceptance_rate !== null && data.acceptance_rate !== undefined)
+      log('Monte Carlo acceptance rate: ' + data.acceptance_rate.toFixed(4)
+          + (data.acceptance_rate < 0.01 ? ' (low: the box is likely underestimated; consider the exact method)' : ''),
+          data.acceptance_rate < 0.01 ? 'warn' : undefined);
     log('Parameters estimated. jmax=' + data.jmax.toExponential(3)
         + '  configs used: ' + data.num_configs_used + incompMsg);
     if (data.incompatible) log('Warning: error bounds suggest model is not compatible with the data.', 'warn');
@@ -2524,19 +2546,19 @@ const HELP_TIPS = {
   errmethod: {
     label: 'Error bound method',
     def: '',
-    text: 'Quadratic: fast analytic upper bound — conservative. Monte Carlo: samples random energy perturbations — more realistic, recommended for publications.',
+    text: 'All methods bound the region of couplings that reproduce every energy within the tolerance. Exact box (recommended): the exact bounding box of that region, by linear programming. Monte Carlo: random sampling of the region; its box is always inside the exact one and shrinks too much with many couplings. Quadratic bound: box of an ellipsoid containing the region; always larger than the exact box.',
     section: 'tab3'
   },
   mcsteps: {
     label: 'Num. samples',
     def: 'Default: 1000',
-    text: 'Number of Monte Carlo samples. Use 1000 for exploration, 5000–10000 for publication-quality uncertainties.',
+    text: 'Number of points sampled uniformly in an ellipsoid that contains the compatibility region. Only the points inside the region are kept: more samples bring the Monte Carlo box closer to the exact one.',
     section: 'tab3'
   },
   mcfactor: {
     label: 'Size factor',
     def: 'Default: 1.0',
-    text: 'Scales the amplitude of random perturbations relative to the energy tolerance. Keep at 1.0 unless you have a specific reason to change it.',
+    text: 'Scale of the sampling ellipsoid. At 1.0 it is the smallest ellipsoid guaranteed to contain the whole region; smaller values may miss parts of it, larger ones only lower the acceptance rate. Keep at 1.0.',
     section: 'tab3'
   }
 };

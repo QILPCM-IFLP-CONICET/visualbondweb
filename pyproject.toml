@@ -28,3 +28,10 @@ include = ["visualbondweb*"]
 
 [tool.setuptools.package-data]
 visualbondweb = ["static/*", "static/**/*"]
+
+[project.optional-dependencies]
+test = ["pytest", "httpx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
