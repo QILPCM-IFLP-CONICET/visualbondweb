@@ -4,7 +4,9 @@ Visualbond — FastAPI backend for spectrojotometer
 import logging
 import os
 import tempfile
+import threading
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -30,6 +32,39 @@ from spectrojotometer.model_io import (
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("visualbond")
+
+
+class _WarningCollector(logging.Handler):
+    """Collect the warnings emitted from one thread."""
+
+    def __init__(self):
+        super().__init__(level=logging.WARNING)
+        self.thread = threading.get_ident()
+        self.messages = []
+
+    def emit(self, record):
+        if record.thread == self.thread:
+            self.messages.append(record.getMessage())
+
+
+@contextmanager
+def library_warnings():
+    """
+    Collect the warnings that spectrojotometer emits inside the block, to
+    return them to the client (they also go to the server log, as usual).
+
+    Requests are served concurrently and share the library's logger, so
+    only the messages emitted from the current thread are collected. The
+    block must not await: in async endpoints, other requests could run in
+    the same thread meanwhile.
+    """
+    collector = _WarningCollector()
+    library_logger = logging.getLogger("spectrojotometer")
+    library_logger.addHandler(collector)
+    try:
+        yield collector.messages
+    finally:
+        library_logger.removeHandler(collector)
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -253,7 +288,8 @@ async def upload_model(
     tmp.write_bytes(content)
 
     try:
-        model = magnetic_model_from_file(filename=str(tmp), primitive_cell=primitive_cell)
+        with library_warnings() as warnings:
+            model = magnetic_model_from_file(filename=str(tmp), primitive_cell=primitive_cell)
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=f"Cannot parse model: {exc}")
@@ -281,6 +317,7 @@ async def upload_model(
     num_atoms = len(model.site_properties.get("coord_atomos", []))
 
     return {
+        "warnings": warnings,
         "session_id": sid,
         "filename": file.filename,
         "cif_text": cif_text,
@@ -309,9 +346,10 @@ async def update_model_cif(session_id: str, file: UploadFile = File(...)):
     tmp = TMPDIR / f"{uuid.uuid4()}.cif"
     tmp.write_text(content)
     try:
-        model = magnetic_model_from_file(
-            filename=str(tmp), primitive_cell=sess.get("primitive_cell", False)
-        )
+        with library_warnings() as warnings:
+            model = magnetic_model_from_file(
+                filename=str(tmp), primitive_cell=sess.get("primitive_cell", False)
+            )
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=f"Cannot parse updated CIF: {exc}")
@@ -321,6 +359,7 @@ async def update_model_cif(session_id: str, file: UploadFile = File(...)):
     sess["model"] = model
     sess["cif_path"] = str(tmp)
     return {
+        "warnings": warnings,
         "status": "updated",
         "cell_size": model.lattice_properties.get("cell_size"),
         "primitive_cell": sess.get("primitive_cell", False),
@@ -347,9 +386,10 @@ def validate_and_update_cif(session_id: str, req: ValidateCifRequest):
     tmp = TMPDIR / f"{uuid.uuid4()}.cif"
     tmp.write_text(req.cif_text)
     try:
-        model = magnetic_model_from_file(
-            filename=str(tmp), primitive_cell=sess.get("primitive_cell", False)
-        )
+        with library_warnings() as warnings:
+            model = magnetic_model_from_file(
+                filename=str(tmp), primitive_cell=sess.get("primitive_cell", False)
+            )
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=str(exc))
@@ -361,6 +401,7 @@ def validate_and_update_cif(session_id: str, req: ValidateCifRequest):
     num_atoms = len(model.site_properties.get("coord_atomos", []))
     bonds_info = [{"name": name} for name in model.bonds] if model.bonds else []
     return {
+        "warnings": warnings,
         "status": "ok",
         "num_atoms": num_atoms,
         "cell_size": model.lattice_properties.get("cell_size", 0),
@@ -395,9 +436,10 @@ def set_primitive_cell(session_id: str, req: PrimitiveCellRequest):
     tmp = TMPDIR / f"{uuid.uuid4()}.cif"
     tmp.write_text(cif_text)
     try:
-        model = magnetic_model_from_file(
-            filename=str(tmp), primitive_cell=req.primitive_cell
-        )
+        with library_warnings() as warnings:
+            model = magnetic_model_from_file(
+                filename=str(tmp), primitive_cell=req.primitive_cell
+            )
     except Exception as exc:
         tmp.unlink(missing_ok=True)
         raise HTTPException(status_code=422, detail=str(exc))
@@ -407,6 +449,7 @@ def set_primitive_cell(session_id: str, req: PrimitiveCellRequest):
     sess["cif_path"] = str(tmp)
     sess["primitive_cell"] = req.primitive_cell
     return {
+        "warnings": warnings,
         "status": "ok",
         "primitive_cell": req.primitive_cell,
         "num_atoms": len(model.site_properties.get("coord_atomos", [])),
@@ -585,9 +628,7 @@ def evaluate_couplings(req: EvaluateRequest):
         raise HTTPException(status_code=400, detail="No bonds defined.")
 
     try:
-        print("parse configs")
         energies, confs, labels = _parse_configs(req.configs_text, model)
-        print("   done")
     except HTTPException:
         raise
     except Exception as exc:
@@ -620,15 +661,19 @@ def evaluate_couplings(req: EvaluateRequest):
             "exact" if req.use_montecarlo is None
             else ("montecarlo" if req.use_montecarlo else "ellipse")
         )
+    logger.info(
+        "evaluate: %d configurations with energy, method=%s", len(valid_confs), method
+    )
     try:
-        js, jerr, chis, ar = model.compute_couplings(
-            valid_confs,
-            valid_energs,
-            err_energs=req.energy_tolerance,
-            method=method,
-            mcsteps=req.mc_steps,
-            mcsizefactor=req.mc_size_factor,
-        )
+        with library_warnings() as warnings:
+            js, jerr, chis, ar = model.compute_couplings(
+                valid_confs,
+                valid_energs,
+                err_energs=req.energy_tolerance,
+                method=method,
+                mcsteps=req.mc_steps,
+                mcsizefactor=req.mc_size_factor,
+            )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Coupling computation failed: {exc}")
 
@@ -677,7 +722,11 @@ def evaluate_couplings(req: EvaluateRequest):
     )
 
     # Bound inequalities
-    ineqs_raw = model.bound_inequalities(valid_confs, valid_energs, err_energs=req.energy_tolerance)
+    with library_warnings() as more_warnings:
+        ineqs_raw = model.bound_inequalities(
+            valid_confs, valid_energs, err_energs=req.energy_tolerance
+        )
+    warnings.extend(more_warnings)
     # bound_inequalities returns (v, center, half_width), meaning
     # |v . J - center| <= half_width.
     inequalities = [
@@ -692,6 +741,7 @@ def evaluate_couplings(req: EvaluateRequest):
     ]
 
     return {
+        "warnings": warnings,
         "jmax": jmax,
         "parameters": parameters,
         "chis": [float(c) for c in chis],

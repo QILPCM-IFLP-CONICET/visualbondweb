@@ -1,0 +1,2 @@
+# WIEN2k .struct files are fixed-width: trailing spaces are significant.
+*.struct -whitespace

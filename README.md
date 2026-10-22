@@ -50,7 +50,7 @@ at `/docs` once the server is running.
   * `primitive_cell` (optional, bool, default `false`) — see below.
 
   Returns `session_id`, `cif_text`, `num_atoms`, `cell_size`,
-  `primitive_cell`, `space_group_symbol`, `bonds`.
+  `primitive_cell`, `space_group_symbol`, `bonds`, `warnings`.
 
 * `GET /model/{session_id}/cif` — current CIF text for the session.
 * `POST /model/{session_id}/cif` — replace the model from an edited CIF
@@ -89,6 +89,21 @@ no information left to recover the compact form automatically. Use
 `POST /model/{session_id}/primitive_cell` to change the setting
 mid-session instead of trying to smuggle it into another endpoint.
 
+### Warnings
+
+The endpoints that load a model (`/model/upload`, `/model/{id}/cif`,
+`/model/{id}/validate`, `/model/{id}/primitive_cell`) and `/evaluate`
+return a `warnings` field: the list of warnings that spectrojotometer
+emitted while serving that request (e.g. bonds of the CIF file that
+could not be used, or a model incompatible with the energies). The
+frontend shows them in its log panel. They also go to the server log,
+like every other message of the library and of the API, through the
+standard `logging` module.
+
+Requests are served concurrently and share the library's logger; each
+response only gets the warnings emitted while serving that request
+(see `library_warnings` in `visualbondweb/api.py`).
+
 ### Bonds and configurations
 
 See the endpoint docstrings under `/docs` for `add_bonds`,
@@ -120,6 +135,7 @@ Request body:
 Response:
 
 * `method`: the method used.
+* `warnings`: warnings of spectrojotometer while computing (see below).
 * `parameters`: one entry per parameter. The first one, `E0`, is the
   average energy of the configurations (the coupling columns are
   centered when solving). For each coupling: `value`, `error` (half
