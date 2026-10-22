@@ -6,7 +6,7 @@ import os
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import numpy as np
 
@@ -85,7 +85,10 @@ class EvaluateRequest(BaseModel):
     session_id: str
     configs_text: str          # raw .spin file content with energies
     energy_tolerance: float = 0.001
-    use_montecarlo: bool = True
+    # Error-bound method: "exact" (default), "montecarlo" or "ellipse".
+    method: Optional[Literal["exact", "montecarlo", "ellipse"]] = None
+    # Deprecated: kept for older clients. Used only if method is None.
+    use_montecarlo: Optional[bool] = None
     mc_steps: int = 1000
     mc_size_factor: float = 1.0
     output_format: str = "plain"   # plain | latex | wolfram
@@ -611,37 +614,60 @@ def evaluate_couplings(req: EvaluateRequest):
             ),
         )
 
+    method = req.method
+    if method is None:
+        method = (
+            "exact" if req.use_montecarlo is None
+            else ("montecarlo" if req.use_montecarlo else "ellipse")
+        )
     try:
-        print("compute couplings")
         js, jerr, chis, ar = model.compute_couplings(
             valid_confs,
             valid_energs,
             err_energs=req.energy_tolerance,
-            montecarlo=req.use_montecarlo,
-            mcsteps=req.mc_steps if req.use_montecarlo else None,
+            method=method,
+            mcsteps=req.mc_steps,
             mcsizefactor=req.mc_size_factor,
         )
-        print("  done")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Coupling computation failed: {exc}")
 
     bond_names = list(model.bonds.keys())
     offset_energy = float(js[-1])
-    js_vals = js[:-1]                     # remove E0
-    jmax = float(np.max(np.abs(js_vals))) if len(js_vals) else 1.0
+    js_vals = np.asarray(js[:-1], dtype=float)  # remove E0
+    jerr = np.asarray(jerr, dtype=float)
+    # Undetermined couplings come back with a nan error bar. nan is not
+    # valid JSON, so they are reported as null with an explicit flag.
+    undetermined = np.isnan(jerr[:-1])
+    determined_vals = np.abs(js_vals[~undetermined])
+    jmax = float(np.max(determined_vals)) if len(determined_vals) else 1.0
+    if jmax == 0:
+        jmax = 1.0
     fmt = req.output_format
-    incompatible = bool(np.any(np.array(jerr) < 0))
+    incompatible = bool(np.any(jerr < 0))
 
     # Build parameter list
     parameters = [{"name": "E0", "value": offset_energy, "error": None, "incompatible": False}]
     for i, name in enumerate(bond_names):
+        if undetermined[i]:
+            parameters.append({
+                "name": name,
+                "value": None,
+                "value_normalized": None,
+                "error": None,
+                "error_normalized": None,
+                "incompatible": False,
+                "undetermined": True,
+            })
+            continue
         parameters.append({
             "name": name,
             "value": float(js_vals[i]),
-            "value_normalized": float(js_vals[i] / jmax) if jmax else 0,
+            "value_normalized": float(js_vals[i] / jmax),
             "error": float(jerr[i]),
-            "error_normalized": float(jerr[i] / jmax) if jmax else 0,
+            "error_normalized": float(jerr[i] / jmax),
             "incompatible": bool(jerr[i] < 0),
+            "undetermined": False,
         })
 
     # Equations for the configurations that have energies
@@ -652,9 +678,17 @@ def evaluate_couplings(req: EvaluateRequest):
 
     # Bound inequalities
     ineqs_raw = model.bound_inequalities(valid_confs, valid_energs, err_energs=req.energy_tolerance)
+    # bound_inequalities returns (v, center, half_width), meaning
+    # |v . J - center| <= half_width.
     inequalities = [
-        {"coefficients": list(map(float, iq[0])), "lower": float(iq[1]), "upper": float(iq[2])}
-        for iq in ineqs_raw
+        {
+            "coefficients": [float(c) for c in v],
+            "center": float(center),
+            "half_width": float(half_width),
+            "lower": float(center - half_width),
+            "upper": float(center + half_width),
+        }
+        for v, center, half_width in ineqs_raw
     ]
 
     return {
@@ -662,7 +696,8 @@ def evaluate_couplings(req: EvaluateRequest):
         "parameters": parameters,
         "chis": [float(c) for c in chis],
         "chi_labels": valid_labels,
-        "acceptance_rate": float(ar) if req.use_montecarlo else None,
+        "method": method,
+        "acceptance_rate": float(ar) if method == "montecarlo" else None,
         "incompatible": incompatible,
         "equations": equations,
         "inequalities": inequalities,

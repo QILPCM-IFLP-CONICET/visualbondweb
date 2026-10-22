@@ -989,17 +989,23 @@
         are needed.</p>
 
         <h3 id="tab3-errmethod">Error bound method</h3>
-        <p>Visualbond can estimate error bounds on the <em>J</em> values using two methods:</p>
+        <p>The error bars are the half widths of a box containing the <em>compatibility
+        region</em>: the set of coupling constants that reproduce every computed energy within
+        the energy tolerance. Visualbond offers three ways to estimate that box:</p>
 
         <table class="field-table">
           <tr><th>Method</th><th>Description</th></tr>
           <tr>
-            <td class="field-name">Quadratic bound</td>
-            <td class="field-desc">An analytic upper bound derived from the energy tolerance and the condition number. Fast but conservative (overestimates errors).</td>
+            <td class="field-name">Exact box</td>
+            <td class="field-desc">The exact bounding box of the compatibility region, computed by linear programming (the minimum and maximum of each <em>J</em> over the region). Deterministic and fast for any realistic number of couplings. This is the default and recommended method.</td>
           </tr>
           <tr>
             <td class="field-name">Monte Carlo</td>
-            <td class="field-desc">Samples values for the coupling constants with a gaussian distribution centered on the least square solution. Then, discard all the samples leading to a set of energies which differs for some configurations from its DFT estimation in more than a given tolerance. Using the remaining set, the confidence interval for each coupling constant  <em>J</em> is evaluated as the minimal interval compatible with all the valid samples. This approach is more accurate than the quadratic bound, and is the recommended for final results.</td>
+            <td class="field-desc">Samples points uniformly inside an ellipsoid that contains the compatibility region, and keeps those that reproduce all the energies within the tolerance. The box of the kept points is always inside the exact box, and underestimates it more as the number of couplings grows (the acceptance rate also drops quickly). Useful mainly to obtain a cloud of compatible couplings.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Quadratic bound</td>
+            <td class="field-desc">The bounding box of that ellipsoid, obtained analytically. Always contains the exact box, so it overestimates the errors.</td>
           </tr>
         </table>
 
@@ -1013,12 +1019,12 @@
           <tr>
             <td class="field-name">Num. samples</td>
             <td class="field-default">1000</td>
-            <td class="field-desc">(Monte Carlo only) Number of random perturbation samples. 1000 is adequate for most purposes; increase to 5000–10000 for publication-quality uncertainties.</td>
+            <td class="field-desc">(Monte Carlo only) Number of points sampled in the ellipsoid. Only those inside the compatibility region are kept, so more samples bring the Monte Carlo box closer to the exact one.</td>
           </tr>
           <tr>
             <td class="field-name">Size factor</td>
             <td class="field-default">1.0</td>
-            <td class="field-desc">(Monte Carlo only) Scales the amplitude of random perturbations relative to the energy tolerance. Keep at 1.0 unless you have a specific reason to change it.</td>
+            <td class="field-desc">(Monte Carlo only) Scale of the sampling ellipsoid. At 1.0 it is the smallest one guaranteed to contain the whole region; smaller values may miss parts of it, larger ones only lower the acceptance rate. Keep at 1.0.</td>
           </tr>
         </table>
 
@@ -1082,15 +1088,19 @@
           <span class="eq-s">A<sub>k</sub>(<strong>σ</strong>)</span>
           <br>
           <span style="font-size:10px;color:var(--text3)">
-            # A<sub>k</sub>(<strong>σ</strong>) = number of unlike-spin pairs of bond type k in configuration σ
+            # A<sub>k</sub>(<strong>σ</strong>) = −Σ<sub>(i,j)∈k</sub> s<sub>i</sub>s<sub>j</sub> = (antiparallel pairs) − (parallel pairs) of bond type k, with s<sub>i</sub> = ±1
           </span>
         </div>
 
         <p>Here <em>k</em> runs over the symmetry-inequivalent bond types found in the crystal
         (e.g. first neighbors J<sub>1</sub>, second neighbors J<sub>2</sub>, …), and
-        A<sub>k</sub>(<strong>σ</strong>) counts the number of antiparallel spin pairs of that
-        type in configuration <strong>σ</strong>. E<sub>0</sub> is an overall energy offset
-        (the ferromagnetic reference energy).</p>
+        A<sub>k</sub>(<strong>σ</strong>) = −Σ s<sub>i</sub>s<sub>j</sub>, summed over the pairs
+        (i, j) of that type, with s<sub>i</sub> = ±1 the orientation of each spin: each
+        antiparallel pair adds +1 and each parallel pair −1. A positive J<sub>k</sub> therefore
+        favours parallel alignment. The spin length is absorbed into the couplings.
+        E<sub>0</sub> is an overall energy offset. Since the coupling columns are centered
+        when solving, the value reported as E0 in the results is the average energy of the
+        configurations used.</p>
 
         <p>Computing the total energy for <em>M</em> different configurations gives a linear
         system:</p>
@@ -1147,39 +1157,38 @@
         </div>
 
         <h3 id="method-errors">Error bounds on coupling constants</h3>
-        <p>Given DFT energies with uncertainty δE, spectrojotometer provides two kinds of
-        error bounds on the extracted <em>J</em> values:</p>
+        <p>Given DFT energies with uncertainty δE, the coupling constants compatible with the
+        data form the <em>compatibility region</em></p>
+        <p><code style="font-size:11px">P = { J : max<sub>i</sub> |(A·J − E)<sub>i</sub>| ≤ δE }</code>,</p>
+        <p>a convex polytope. Since |v|<sub>2</sub>² ≤ M |v|<sub>∞</sub>², it is contained in the ellipsoid</p>
+        <p><code style="font-size:11px">|A·(J − J<sub>LS</sub>)|² ≤ M δE² − |r|²</code>,</p>
+        <p>where J<sub>LS</sub> is the least-squares solution, r its residual and M the number of
+        configurations. The reported J ± δJ is a box around P:</p>
 
         <table class="field-table">
           <tr><th>Method</th><th>Description</th></tr>
           <tr>
-            <td class="field-name">Quadratic bound</td>
-            <td class="field-desc">
-              An analytic bound derived from the pseudo-inverse of <strong>A</strong>:
-              <br><br>
-              <code style="font-size:11px">δJ ≤ ‖A<sup>+</sup>‖ · δE</code>
-              <br><br>
-              Fast to compute and always valid, but typically conservative (overestimates the
-              actual uncertainty). The displayed error is an upper bound, not a standard deviation.
-            </td>
+            <td class="field-name">Exact box</td>
+            <td class="field-desc">Minimum and maximum of each J<sub>k</sub> over P, obtained by
+            solving 2K linear programs (K = number of parameters). Exact.</td>
           </tr>
           <tr>
             <td class="field-name">Monte Carlo</td>
-            <td class="field-desc">
-              Samples <em>N</em> random perturbation vectors δ<strong>E</strong> drawn
-              uniformly from [−δE, +δE]<sup>M</sup> and solves the perturbed system each time.
-              The reported error is the standard deviation of the resulting distribution of
-              <em>J</em> values — a more realistic estimate of the actual uncertainty.
-              Recommended for final published results.
-            </td>
+            <td class="field-desc">Points drawn uniformly in the ellipsoid; those inside P are
+            kept, so they are uniformly distributed in P. The box of the kept points is inside
+            the exact box. The acceptance rate is vol(P)/vol(ellipsoid), which decreases
+            quickly with the number of couplings.</td>
+          </tr>
+          <tr>
+            <td class="field-name">Quadratic bound</td>
+            <td class="field-desc">Bounding box of the ellipsoid. Contains the exact box.</td>
           </tr>
         </table>
 
-        <p>A parameter set is flagged as <strong>incompatible</strong> when the quadratic bound
-        yields a negative value for one or more <em>J<sub>k</sub></em> — this indicates that
-        the interval [J<sub>k</sub> − δJ<sub>k</sub>, J<sub>k</sub> + δJ<sub>k</sub>] does not
-        include a self-consistent solution, i.e. the data cannot be explained by the chosen model
-        within the stated energy tolerance.</p>
+        <p>All three are invariant under a change of energy units. The model is flagged as
+        <strong>incompatible</strong> when P is empty: no set of couplings reproduces all the
+        energies within δE. A coupling is reported as <strong>not determined</strong> when the
+        configurations with known energies do not fix it (P is unbounded along it).</p>
       </section>
 
       <!-- ─── CITATION ─── -->

@@ -3,10 +3,26 @@
 Web interface (FastAPI backend + static frontend) for the
 [spectrojotometer](https://github.com/mmatera/spectrojotometer) package.
 
-Note: there are currently two near-identical copies of the backend —
-`api_main.py` (repo root) and `visualbondweb/api.py` (the module actually
-installed by `pip install .`, per `pyproject.toml`). Keep changes to both
-in sync until they're unified into a single module.
+Note: the backend is `visualbondweb/api.py` (the module installed by
+`pip install .` and started by `render.yaml`). `api_main.py`, in the repo
+root, is an older copy that no deployment uses; it is out of date
+(it lacks, e.g., `supercell_size` and the error-bound `method`) and
+should not be used as a reference.
+
+## Installation and tests
+
+```bash
+pip install ".[test]"
+pytest
+```
+
+The backend depends on
+[spectrojotometer](https://github.com/QILPCM-IFLP-CONICET/spectrojotometer),
+installed from git. The `/evaluate` endpoint uses
+`compute_couplings(method=...)`, so it needs a version of the library
+that includes it. Pinning the dependency to a specific commit
+(`spectrojotometer @ git+https://...spectrojotometer@<sha>`) avoids
+deploying an untested combination when the library changes.
 
 ## Frontend
 
@@ -76,5 +92,51 @@ mid-session instead of trying to smuggle it into another endpoint.
 ### Bonds and configurations
 
 See the endpoint docstrings under `/docs` for `add_bonds`,
-`optimize_configs`, `optimal_independent_set`, `equations`, `evaluate`,
+`optimize_configs`, `optimal_independent_set`, `equations`,
 and the configuration import/export/download endpoints.
+
+### Estimating the couplings: `POST /evaluate`
+
+Fits the coupling constants to the configurations with known energies,
+and bounds their uncertainty. The couplings compatible with the data
+are those that reproduce every energy within `energy_tolerance`; they
+form a convex polytope, and each error bar is the half width of a box
+around it. See spectrojotometer's README ("Estimating the couplings and
+their uncertainties") for the details.
+
+Request body:
+
+| field | default | meaning |
+|---|---|---|
+| `session_id` | | |
+| `configs_text` | | `.spin` text: `energy [config] # label` per line; `nan` energies are ignored |
+| `energy_tolerance` | `0.001` | maximum error of each energy, in the same units |
+| `method` | `"exact"` | `"exact"`: exact box of the polytope (linear programming). `"montecarlo"`: random sampling, an inner estimate. `"ellipse"`: box of an ellipsoid containing the polytope, an outer estimate |
+| `mc_steps` | `1000` | Monte Carlo samples (only for `"montecarlo"`) |
+| `mc_size_factor` | `1.0` | scale of the Monte Carlo sampling ellipsoid; keep at 1 |
+| `output_format` | `"plain"` | format of `equations`: `plain`, `latex` or `wolfram` |
+| `use_montecarlo` | | deprecated; if `method` is absent, `true` means `"montecarlo"` and `false` means `"ellipse"` |
+
+Response:
+
+* `method`: the method used.
+* `parameters`: one entry per parameter. The first one, `E0`, is the
+  average energy of the configurations (the coupling columns are
+  centered when solving). For each coupling: `value`, `error` (half
+  width of the box), `value_normalized` and `error_normalized`
+  (divided by `jmax`), `incompatible`, and `undetermined`. An
+  undetermined coupling (one that the configurations do not fix) has
+  `null` value and error.
+* `jmax`: the largest determined coupling, in absolute value.
+* `incompatible`: `true` if no set of couplings reproduces all the
+  energies within the tolerance. The errors are then negative.
+* `chis`, `chi_labels`: residual of the least-squares fit for each
+  configuration, relative to the tolerance. Values beyond ±1 point to
+  configurations the model cannot reproduce.
+* `acceptance_rate`: fraction of accepted Monte Carlo samples (`null`
+  for the other methods).
+* `inequalities`: constraints on combinations of couplings,
+  `lower ≤ coefficients · J ≤ upper`. Also given as `center` and
+  `half_width` (`|coefficients · J − center| ≤ half_width`).
+* `equations`: the linear system, formatted.
+* `num_configs_used`.
