@@ -7,7 +7,7 @@ name = "visualbondweb"
 version = "0.2.0"
 description = "Web interface for the spectrojotometer magnetic-model tool"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
     "fastapi>=0.110.0",
