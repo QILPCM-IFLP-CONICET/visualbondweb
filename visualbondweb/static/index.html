@@ -1178,7 +1178,7 @@
       <div class="section-block">
         <div class="field-row">
           <span class="field-label">Num. configs:</span>
-          <input type="number" id="p2-nconf" value="10" min="1" step="1">
+          <input type="number" id="p2-nconf" value="" min="0" step="1" placeholder="auto">
           <button class="help-btn" onclick="showHelpPopover(this,'nconf')">?</button>
         </div>
         <div class="field-row">
@@ -1508,7 +1508,7 @@
       <p>Lx / Ly / Lz expand the primitive cell before bond generation. Use a supercell when spin configurations span more than one unit cell.</p>
       <div class="help-callout tip">
         <span>✦</span>
-        <span>Start with 1×1×1. Enlarge only if the optimizer reports a poor condition number after generating configurations.</span>
+        <span>Start with 1×1×1. Enlarge it only if the optimizer reports a large error bound |ΔJ|/|ΔE| (or ∞: some couplings cannot be determined) after generating configurations.</span>
       </div>
 
       
@@ -1535,7 +1535,7 @@
     <!-- ── Tab 2 ── -->
     <div class="help-section" id="hs-tab2">
       <h2>Tab 2 — Spin Configurations</h2>
-      <p>Build the set of spin configurations that minimizes the condition number of the linear system <em>A·J = E</em>.</p>
+      <p>Build the set of spin configurations whose energies determine the coupling constants with the smallest errors.</p>
 
       <h3>.spin file format</h3>
       <pre><span class="hc"># Energy   [config]          # label</span>
@@ -1547,8 +1547,8 @@
       <table class="help-param-table">
         <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
         <tr>
-          <td class="pname">Num. configs</td><td class="pdef">10</td>
-          <td>Configurations to generate. You need at least N<sub>bonds</sub>+1 with known energies to determine all J values.</td>
+          <td class="pname">Num. configs</td><td class="pdef">auto</td>
+          <td>Configurations to generate. Empty: chosen automatically, the smallest set that determines every J, enlarged while each extra configuration reduces the error bound by at least 5%. At least N<sub>bonds</sub>+1 configurations with known energies are needed.</td>
         </tr>
         <tr>
           <td class="pname">Bunch size</td><td class="pdef">10</td>
@@ -1556,10 +1556,10 @@
         </tr>
         <tr>
           <td class="pname">Iterations</td><td class="pdef">100</td>
-          <td>Optimization steps. More iterations → lower condition number.</td>
+          <td>Optimization steps. More iterations → better sets of configurations, more slowly.</td>
         </tr>
       </table>
-      <p><strong>◈ Optimal independent set</strong> — finds the smallest subset of existing configurations that spans the full coupling-constant space.</p>
+      <p><strong>◈ Optimal independent set</strong> — chooses, among the current configurations, the subset that determines the J values with the smallest error bound (its size follows the same 5% rule).</p>
 
       <h3>Equations panel</h3>
       <p>Shows the linear system derived from the current configurations. Format can be switched to <strong>LaTeX</strong> or <strong>Wolfram</strong>. Updates automatically as you type.</p>
@@ -1607,7 +1607,8 @@
       <p>Computing M configurations gives the linear system <strong>A·J = E</strong>, solved by least squares.</p>
 
       <h3>Optimal configurations</h3>
-      <p>The optimizer minimizes the condition number κ(<strong>A</strong>) using a greedy search: at each step it picks the candidate configuration (from a random pool of size <em>bunch</em>) that most reduces κ. A smaller κ means the ratio |ΔJ|/|ΔE| is smaller — more accurate J values for the same DFT precision.</p>
+      <p>If every energy is known within δE, each J<sub>k</sub> is known within δE·h<sub>k</sub>, where h<sub>k</sub> depends only on the configurations. The reported error bound |ΔJ|/|ΔE| &lt; h is the largest h<sub>k</sub>, computed exactly by linear programming: a smaller bound means more accurate J values for the same DFT precision.</p>
+      <p>The optimizer proposes random candidates (a pool of size <em>bunch</em> at each iteration) and keeps the best subset, which it finds by removing configurations one at a time and then trying exchanges, scored by a fast upper bound of h. The ratio between the largest and smallest singular values of <strong>A</strong> (its condition number) is not used: it measures how relative errors grow, not the absolute error of each J.</p>
 
       <h3>Error bounds</h3>
       <p>The <em>compatibility region</em> is the set of couplings that reproduce every energy within the tolerance: { <strong>J</strong> : max<sub>i</sub> |(<strong>A·J</strong> − <strong>E</strong>)<sub>i</sub>| ≤ δE }. It is a polytope, and the reported J ± δJ is a box around it.</p>
@@ -1672,6 +1673,20 @@ let bondsCount  = 0;
 let confCount   = 0;
 
 // ── API helper ──
+// Show an error caught by an action, unless api() already showed it.
+function reportError(e) {
+  if (!e || !e.logged) log('Error: ' + (e && e.message ? e.message : e), 'err');
+}
+
+// The error bound of a set of configurations: the largest error of a
+// coupling per unit error in the energies (null: some coupling is not
+// determined by the configurations).
+function formatErrorBound(bound) {
+  return (bound === null || bound === undefined)
+    ? '∞ (some couplings are not determined)'
+    : '< ' + Number(bound).toPrecision(4);
+}
+
 async function api(method, path, body = null, isFormData = false) {
   const opts = { method, headers: {} };
   if (body && !isFormData) {
@@ -1691,6 +1706,7 @@ async function api(method, path, body = null, isFormData = false) {
     return data;
   } catch (e) {
     log('API error: ' + e.message, 'err');
+    e.logged = true;  // already shown: reportError will not repeat it
     throw e;
   }
 }
@@ -1865,16 +1881,18 @@ async function addBonds() {
     bondsCount = data.num_bonds;
     updateStatus();
     log('Bonds added: ' + data.bonds.map(b => b.name).join(', ') + '  (' + data.num_bonds + ' type(s))');
-  } catch(e) {}
+  } catch(e) { reportError(e); }
 }
 
 // ── Page 2 actions ──
 async function optimizeConfigs() {
   if (!modelLoaded) { log('Error: no model loaded.', 'err'); return; }
-  const n  = parseInt(document.getElementById('p2-nconf').value);
+  // Empty or 0: the number of configurations is chosen automatically.
+  const nText = document.getElementById('p2-nconf').value.trim();
+  const n  = nText === '' ? null : (parseInt(nText) || null);
   const it = parseInt(document.getElementById('p2-iter').value);
   const us = parseInt(document.getElementById('p2-bunch').value);
-  log('optconfs: num_configs=' + n + ' iterations=' + it + ' bunch=' + us);
+  log('optconfs: num_configs=' + (n === null ? 'automatic' : n) + ' iterations=' + it + ' bunch=' + us);
   try {
     // Sync current config editor to session first
     await syncAndParseConfigs();
@@ -1887,9 +1905,9 @@ async function optimizeConfigs() {
     confCount = (editor.value.match(/^[^#\s]/gm) || []).length;
     document.getElementById('spinStat').textContent = confCount + ' configs';
     updateStatus();
-    log('Generated ' + data.num_new_configs + ' configs. |ΔJ|/|ΔE| < ' + data.condition_number.toFixed(4));
+    log('Generated ' + data.num_new_configs + ' configs. |ΔJ|/|ΔE| ' + formatErrorBound(data.error_bound));
     await recalcEquations();
-  } catch(e) {}
+  } catch(e) { reportError(e); }
 }
 
 async function optimalIndepSet() {
@@ -1900,8 +1918,8 @@ async function optimalIndepSet() {
     const data = await api('POST', '/configs/optimal_independent_set', {session_id: sessionId});
     const editor = document.getElementById('spinEditor');
     setConfigsText(editor.value + '\n' + data.subset_text);
-    log('Optimal independent set. CN=' + data.condition_number.toFixed(4) + '  configs: ' + data.num_configs);
-  } catch(e) {}
+    log('Optimal independent set: ' + data.num_configs + ' configs. |ΔJ|/|ΔE| ' + formatErrorBound(data.error_bound));
+  } catch(e) { reportError(e); }
 }
 
 async function recalcEquations() {
@@ -1916,7 +1934,7 @@ async function recalcEquations() {
     confCount = data.equations ? text.match(/^[^#\s]/gm)?.length || 0 : 0;
     document.getElementById('spinStat').textContent = confCount + ' configs';
     updateStatus();
-  } catch(e) {}
+  } catch(e) { reportError(e); }
 }
 
 async function recalcEquations2() {
@@ -1928,7 +1946,7 @@ async function recalcEquations2() {
       session_id: sessionId, configs_text: text, output_format: fmt
     });
     document.getElementById('p3-equations').value = data.equations;
-  } catch(e) {}
+  } catch(e) { reportError(e); }
 }
 
 async function syncAndParseConfigs() {
@@ -1938,7 +1956,11 @@ async function syncAndParseConfigs() {
     await api('POST', '/configs/parse', {
       session_id: sessionId, configs_text: text, output_format: 'plain'
     });
-  } catch(e) { /* parse errors are shown in log */ }
+  } catch(e) {
+    // api() already showed the error. Stop the action that called us:
+    // going on would use the configurations parsed before.
+    throw e;
+  }
 }
 
 // ── Page 3 actions ──
@@ -2006,7 +2028,7 @@ async function estimateParameters() {
     log('Parameters estimated. jmax=' + data.jmax.toExponential(3)
         + '  configs used: ' + data.num_configs_used + incompMsg);
     if (data.incompatible) log('Warning: error bounds suggest model is not compatible with the data.', 'warn');
-  } catch(e) {}
+  } catch(e) { reportError(e); }
 }
 
 function renderChiChart(chis, labels) {
@@ -2525,8 +2547,8 @@ const HELP_TIPS = {
   },
   nconf: {
     label: 'Num. configs',
-    def: 'Default: 10',
-    text: 'Number of spin configurations to generate. You need at least N_bonds + 1 configurations with known energies to determine all coupling constants.',
+    def: 'Default: automatic',
+    text: 'Number of spin configurations to generate. Leave it empty to choose it automatically: the smallest set that determines every coupling, enlarged while each extra configuration reduces the error bound |ΔJ|/|ΔE| by at least 5%. At least N_bonds + 1 configurations with known energies are needed.',
     section: 'tab2'
   },
   bunch: {
@@ -2538,7 +2560,7 @@ const HELP_TIPS = {
   iterations: {
     label: 'Iterations',
     def: 'Default: 100',
-    text: 'Number of greedy optimization steps. More iterations yield a lower condition number κ(A) and therefore more accurate J values.',
+    text: 'Number of optimization steps: each one proposes new random candidates. More iterations give configurations with a smaller error bound |ΔJ|/|ΔE|, and therefore more accurate J values, more slowly.',
     section: 'tab2'
   },
   etol: {

@@ -1,15 +1,14 @@
 # visualbondweb
 
 Web interface (FastAPI backend + static frontend) for the
-[spectrojotometer](https://github.com/mmatera/spectrojotometer) package.
+[spectrojotometer](https://github.com/QILPCM-IFLP-CONICET/spectrojotometer) package.
 
-Note: the backend is `visualbondweb/api.py` (the module installed by
-`pip install .` and started by `render.yaml`). `api_main.py`, in the repo
-root, is an older copy that no deployment uses; it is out of date
-(it lacks, e.g., `supercell_size` and the error-bound `method`) and
-should not be used as a reference.
+The backend is `visualbondweb/api.py` (the module installed by
+`pip install .` and started by `render.yaml` and the `Dockerfile`).
 
 ## Installation and tests
+
+Python 3.11 or later.
 
 ```bash
 pip install ".[test]"
@@ -17,12 +16,13 @@ pytest
 ```
 
 The backend depends on
-[spectrojotometer](https://github.com/QILPCM-IFLP-CONICET/spectrojotometer),
-installed from git. The `/evaluate` endpoint uses
-`compute_couplings(method=...)`, so it needs a version of the library
-that includes it. Pinning the dependency to a specific commit
-(`spectrojotometer @ git+https://...spectrojotometer@<sha>`) avoids
-deploying an untested combination when the library changes.
+[spectrojotometer](https://github.com/QILPCM-IFLP-CONICET/spectrojotometer)
+0.3.0 or later (the error-bound methods of `/evaluate` and the error
+bound of a set of configurations), installed from git and pinned to a
+specific commit in `requirements.txt` and `pyproject.toml`
+(`spectrojotometer @ git+https://...spectrojotometer@<sha>`), so that a
+change in the library reaches the server only through an explicit
+update, tested by the CI.
 
 ## Frontend
 
@@ -106,9 +106,37 @@ response only gets the warnings emitted while serving that request
 
 ### Bonds and configurations
 
-See the endpoint docstrings under `/docs` for `add_bonds`,
-`optimize_configs`, `optimal_independent_set`, `equations`,
-and the configuration import/export/download endpoints.
+`POST /model/add_bonds` generates the couplings of the model, and
+`POST /configs/parse` and the download endpoints handle the
+configuration files; see their docstrings under `/docs`.
+
+Three endpoints report the **error bound** of a set of configurations,
+`error_bound`: the largest error of a coupling per unit error in the
+energies (`MagneticModel.cost` of spectrojotometer). If every energy is
+known within δE, no coupling has an error larger than δE ×
+`error_bound`. It is `null` when the configurations do not determine
+every coupling. `condition_number` is the same value as text (`"inf"`
+for undetermined couplings), kept for older clients; despite its name, it
+is not the condition number of the coefficient matrix.
+
+* `POST /configs/equations` (`session_id`, `configs_text`,
+  `output_format`): parses the configurations, stores them in the
+  session and returns the formatted linear system, `equations`, with
+  its `error_bound`.
+* `POST /configs/optimize` (`session_id`, `num_configs`, `bunch_size` =
+  10, `iterations` = 100, `min_improvement` = 0.05): proposes new
+  configurations that, together with the ones of the session with known
+  energies, minimize the error bound. Returns `new_configs_text`
+  (energies `nan`), `num_new_configs` and `error_bound`.
+* `POST /configs/optimal_independent_set` (`session_id`, `num_configs`,
+  `min_improvement` = 0.05): the subset of the configurations of the
+  session with the smallest error bound. Returns `subset_text`,
+  `num_configs` and `error_bound`.
+
+When `num_configs` is omitted (or 0), the number of configurations is
+chosen automatically: the smallest set that determines every coupling,
+enlarged while each extra configuration reduces the error bound by at
+least `min_improvement` (5% by default).
 
 ### Estimating the couplings: `POST /evaluate`
 

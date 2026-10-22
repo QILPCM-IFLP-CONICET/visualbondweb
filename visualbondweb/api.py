@@ -22,7 +22,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from spectrojotometer.model_io import (
     confindex,
@@ -32,6 +32,27 @@ from spectrojotometer.model_io import (
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("visualbond")
+
+
+def _error_bound_fields(cost):
+    """
+    The error bound of a set of configurations (MagneticModel.cost: the
+    largest error of a coupling per unit error in the energies) for a
+    response: a number, or None if some coupling is not determined (inf is
+    not valid JSON). condition_number is kept, as text, for older clients.
+    """
+    cost = float(cost)
+    return {
+        "error_bound": cost if np.isfinite(cost) else None,
+        "condition_number": str(cost),
+    }
+
+
+def _error_bound_label(cost):
+    cost = float(cost)
+    if not np.isfinite(cost):
+        return "|ΔJ|/|ΔE| = inf (some couplings are not determined)"
+    return f"|ΔJ|/|ΔE| < {cost:.4g}"
 
 
 class _WarningCollector(logging.Handler):
@@ -107,13 +128,20 @@ class AddBondsRequest(BaseModel):
 
 class OptimizeConfigsRequest(BaseModel):
     session_id: str
-    num_configs: int = 10
+    # Number of new configurations. None (or 0): chosen automatically, the
+    # smallest set that determines every coupling, enlarged while each
+    # configuration reduces the error bound by at least min_improvement.
+    num_configs: Optional[int] = None
+    min_improvement: float = Field(0.05, ge=0.0, le=1.0)
     bunch_size: int = 10
     iterations: int = 100
 
 
 class OptimalIndepSetRequest(BaseModel):
     session_id: str
+    # As in OptimizeConfigsRequest.
+    num_configs: Optional[int] = None
+    min_improvement: float = Field(0.05, ge=0.0, le=1.0)
 
 
 class EvaluateRequest(BaseModel):
@@ -520,25 +548,27 @@ def optimize_configs(req: OptimizeConfigsRequest):
         else:
             start.append(c)
 
-    update_size = max(req.bunch_size, req.num_configs)
+    num_configs = req.num_configs or None
+    update_size = max(req.bunch_size, num_configs or 1)
     try:
         newconfs, cn = model.find_optimal_configurations(
-            num_new_confs=req.num_configs,
+            num_new_confs=num_configs,
             start=start,
             known=known,
             its=req.iterations,
             update_size=update_size,
+            min_improvement=req.min_improvement,
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Optimization failed: {exc}")
 
     new_labels = [str(confindex(c)) for c in newconfs]
-    lines = [f"\n# New configurations. |ΔJ|/|ΔE| < {cn:.4g}:"]
+    lines = [f"\n# New configurations. {_error_bound_label(cn)}:"]
     for i, nc in enumerate(newconfs):
         lines.append(f"nan\t{_fmt_conf(nc)}\t\t# {new_labels[i]}")
 
     return {
-        "condition_number": str(cn),
+        **_error_bound_fields(cn),
         "new_configs_text": "\n".join(lines),
         "num_new_configs": len(newconfs),
     }
@@ -559,17 +589,21 @@ def optimal_independent_set(req: OptimalIndepSetRequest):
         raise HTTPException(status_code=400, detail="No configurations loaded.")
 
     try:
-        newconfs, cn = model.optimize_independent_set(confs)
+        newconfs, cn = model.optimize_independent_set(
+            confs,
+            length=req.num_configs or None,
+            min_improvement=req.min_improvement,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed: {exc}")
 
     new_labels = [str(confindex(c)) for c in newconfs]
-    lines = [f"\n# Optimal independent subset. sqrt(l)/||A^-1|| = {cn:.4g}:"]
+    lines = [f"\n# Optimal independent subset. {_error_bound_label(cn)}:"]
     for i, nc in enumerate(newconfs):
         lines.append(f"# {_fmt_conf(nc)}\t\t# {new_labels[i]}")
 
     return {
-        "condition_number": str(cn),
+        **_error_bound_fields(cn),
         "subset_text": "\n".join(lines),
         "num_configs": len(newconfs),
     }
@@ -599,16 +633,20 @@ def get_equations(req: EquationsRequest):
     sess["configurations"] = (energies, confs, labels)
 
     if not confs:
-        return {"equations": "# No configurations loaded.\n", "condition_number": None}
+        return {
+            "equations": "# No configurations loaded.\n",
+            "error_bound": None,
+            "condition_number": None,
+        }
 
     cm = model.coefficient_matrix(confs, False)
     equations = model.formatted_equations(
         cm, ensname=None, comments=labels, eq_format=req.output_format
     )
     cost = model.cost(confs)
-    equations += f"\n\n|ΔJ|/|ΔE| < {cost:.4g}"
+    equations += "\n\n" + _error_bound_label(cost)
 
-    return {"equations": equations, "condition_number": str(cost)}
+    return {"equations": equations, **_error_bound_fields(cost)}
 
 
 # ── Evaluate couplings ────────────────────────────────────────────────────────

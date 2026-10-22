@@ -906,16 +906,17 @@
         </table>
 
         <h3 id="tab2-optimize">Optimizing configurations</h3>
-        <p>The <strong>Optimize</strong> panel generates a set of spin configurations that minimizes
-        the condition number of the linear system <em>A·J = E</em>. A smaller condition number
-        means more reliable <em>J</em> estimates.</p>
+        <p>The <strong>Optimize</strong> panel generates a set of spin configurations whose
+        energies determine the coupling constants with the smallest errors: it minimizes the
+        error bound |ΔJ|/|ΔE|, the largest error of a coupling per unit error in the energies
+        (see <a href="#method-optconf">Optimal configurations</a>).</p>
 
         <table class="field-table">
           <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
           <tr>
             <td class="field-name">Num. configs</td>
-            <td class="field-default">10</td>
-            <td class="field-desc">Number of new configurations to generate and append to the editor. You need at least <em>N<sub>bonds</sub> + 1</em> configurations with known energies to determine all coupling constants.</td>
+            <td class="field-default">auto</td>
+            <td class="field-desc">Number of new configurations to generate and append to the editor. Leave it empty to choose it automatically: the smallest set that determines every coupling, enlarged while each extra configuration reduces the error bound by at least 5%. You need at least <em>N<sub>bonds</sub> + 1</em> configurations with known energies to determine all coupling constants.</td>
           </tr>
           <tr>
             <td class="field-name">Bunch size</td>
@@ -925,17 +926,18 @@
           <tr>
             <td class="field-name">Iterations</td>
             <td class="field-default">100</td>
-            <td class="field-desc">Number of optimization iterations. More iterations yield a better condition number but take longer.</td>
+            <td class="field-desc">Number of optimization iterations, each one proposing new random candidates. More iterations give a smaller error bound but take longer.</td>
           </tr>
         </table>
 
         <p>After pressing <strong>⬟ Optimize</strong>, new lines are appended to the configuration
-        editor with energies set to <code>nan</code> and a comment showing the condition number
-        estimate.</p>
+        editor with energies set to <code>nan</code> and a comment showing the error bound
+        |ΔJ|/|ΔE| of the known configurations together with the new ones.</p>
 
-        <p><strong>◈ Optimal independent set</strong> — finds the smallest subset of the current
-        configurations that spans the full coupling-constant space. Useful for reducing the number
-        of DFT calculations needed.</p>
+        <p><strong>◈ Optimal independent set</strong> — chooses, among the current
+        configurations, the subset that determines the couplings with the smallest error bound
+        (its size follows the same 5% rule). Useful for reducing the number of DFT calculations
+        needed.</p>
 
         <h3 id="tab2-equations">Equations panel</h3>
         <p>The right-hand panel shows the linear equations that relate total energies to coupling
@@ -1116,44 +1118,60 @@
         </div>
 
         <p>This system is solved in the least-squares sense when <em>M > K+1</em>. The quality
-        of the determination depends critically on the <strong>condition number</strong>
-        κ(<strong>A</strong>): a large condition number amplifies energy errors into large
-        uncertainties on <strong>J</strong>.</p>
+        of the determination depends on the configurations: if every energy is known within
+        δE, each coupling J<sub>k</sub> is known within δE·h<sub>k</sub>, where h<sub>k</sub>
+        depends only on <strong>A</strong> (see below).</p>
 
         <h3 id="method-optconf">Optimal configurations</h3>
-        <p>The key contribution of the paper is an algorithm to find the set of spin
-        configurations <strong>σ</strong><sup>(1)</sup>, …, <strong>σ</strong><sup>(M)</sup>
-        that <em>minimizes</em> the condition number κ(<strong>A</strong>), thereby requiring
-        the fewest DFT calculations for a given target accuracy.</p>
+        <p>The aim is to find the spin configurations <strong>σ</strong><sup>(1)</sup>, …,
+        <strong>σ</strong><sup>(M)</sup> that determine the couplings with the smallest errors,
+        so that the fewest DFT calculations reach a given accuracy. The original method
+        minimized the condition number κ(<strong>A</strong>). The current version minimizes
+        instead the quantity that the errors depend on directly:</p>
 
-        <p>The algorithm is iterative:</p>
+        <div class="hero-equation">
+          <span class="eq-lhs">h<sub>k</sub></span>
+          <span class="eq-sum"> = </span>
+          <span class="eq-s">max { |J<sub>k</sub>| : max<sub>i</sub> |(<strong>A·J</strong>)<sub>i</sub>| ≤ 1 }</span>
+          <br>
+          <span style="font-size:10px;color:var(--text3)">
+            # error bound: |ΔJ|/|ΔE| &lt; max<sub>k</sub> h<sub>k</sub>
+          </span>
+        </div>
+
+        <p>h<sub>k</sub> is the largest error of J<sub>k</sub> per unit error in the energies,
+        computed exactly by linear programming. The condition number measures how
+        <em>relative</em> errors grow, and depends on the scale of each column of
+        <strong>A</strong>; in tests it often preferred sets of configurations with larger
+        errors.</p>
+
+        <p>The search:</p>
         <div class="steps">
           <div class="step">
             <div class="step-num">1</div>
-            <div class="step-body">Start from any initial set of configurations (or an empty set).</div>
+            <div class="step-body">Start from the current configurations (the ones with known energies are kept).</div>
           </div>
           <div class="step">
             <div class="step-num">2</div>
-            <div class="step-body">At each iteration, generate a <em>bunch</em> of candidate configurations at random and evaluate κ for each candidate added to the current set.</div>
+            <div class="step-body">At each iteration, add a <em>bunch</em> of random candidates.</div>
           </div>
           <div class="step">
             <div class="step-num">3</div>
-            <div class="step-body">Keep the candidate that most reduces κ and add it to the set.</div>
+            <div class="step-body">Choose the best subset: remove candidates one at a time (the one whose removal hurts least), then try exchanging chosen and discarded ones. Subsets are scored with a fast upper bound of max<sub>k</sub> h<sub>k</sub>.</div>
           </div>
           <div class="step">
             <div class="step-num">4</div>
-            <div class="step-body">Repeat until the desired number of configurations is reached.</div>
+            <div class="step-body">Keep the new subset if it is better, and repeat.</div>
           </div>
         </div>
 
-        <p>This greedy strategy is efficient and produces near-optimal configuration sets in
-        practice. The condition number reported after optimization is an upper bound on
-        |ΔJ| / |ΔE|: the relative error in the coupling constants is at most κ times the
-        relative error in the DFT energies.</p>
+        <p>Unless the number of configurations is given, it is the smallest that determines
+        every coupling, enlarged while each extra configuration reduces the error bound by at
+        least 5%. The bound reported at the end is the exact one.</p>
 
         <div class="callout info">
           <span class="callout-icon">ℹ</span>
-          <span>The <strong>Optimal independent set</strong> button finds the smallest subset of configurations that achieves the same (or similar) condition number — useful when you already have more configurations than strictly necessary and want to minimize DFT runs.</span>
+          <span>The <strong>Optimal independent set</strong> button applies the same choice to the configurations you already have — useful when you have more than necessary and want to minimize DFT runs.</span>
         </div>
 
         <h3 id="method-errors">Error bounds on coupling constants</h3>
