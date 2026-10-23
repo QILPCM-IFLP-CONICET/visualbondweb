@@ -24,9 +24,18 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from spectrojotometer.magnetic_model import (
+    compatible_configurations,
+    equivalent_model,
+    map_configurations,
+    site_maps,
+)
+from spectrojotometer.monte_carlo import SimulationCancelled, run_ising_mc
+from spectrojotometer.monte_carlo.adapter import magnetic_model_to_ising
 from spectrojotometer.model_io import (
     confindex,
     magnetic_model_from_file,
+    parse_spin_configurations,
 )
 
 # ── Logging ──────────────────────────────────────────────────────────────────
@@ -843,3 +852,313 @@ def download_model(session_id: str):
     if not sess["cif_path"] or not Path(sess["cif_path"]).exists():
         raise HTTPException(status_code=404, detail="No model in session.")
     return FileResponse(sess["cif_path"], filename="model.cif", media_type="text/plain")
+
+
+# ── Import configurations from another model ─────────────────────────────────
+#
+# The other model is uploaded on its own (with its own primitive_cell
+# option); its configurations are translated to the model of the session
+# with spectrojotometer.magnetic_model (site_maps, compatible_configurations,
+# map_configurations, equivalent_model).
+
+
+def _import_model(sess: dict):
+    other = sess.get("import_model")
+    if other is None:
+        raise HTTPException(status_code=400, detail="Upload the other model first.")
+    return other
+
+
+@app.post("/import/model")
+async def import_model(
+    session_id: str = Form(...),
+    file: UploadFile = File(...),
+    primitive_cell: bool = Form(False),
+    tol: float = Form(0.1),
+):
+    """
+    Upload the model the configurations come from. Returns the site map
+    (for each site of the session's model, its site in the other model;
+    -1 if none), how it was found ("position": same frame; "structure":
+    aligned with pymatgen's StructureMatcher), the energy scale (ratio of
+    the numbers of sites) and the warnings of the library.
+    """
+    sess = _get_session(session_id)
+    model = sess["model"]
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in (".cif", ".struct"):
+        raise HTTPException(status_code=400, detail="Only .cif and .struct files are supported.")
+    tmp = TMPDIR / f"{uuid.uuid4()}{suffix}"
+    tmp.write_bytes(await file.read())
+    try:
+        with library_warnings() as warnings:
+            other = magnetic_model_from_file(filename=str(tmp), primitive_cell=primitive_cell)
+            site_map, _, method = site_maps(other, model, tol)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Cannot use this model: {exc}")
+    finally:
+        tmp.unlink(missing_ok=True)
+    sess["import_model"] = other
+    sess["import_name"] = file.filename
+    n_other = len(other.site_properties["coord_atomos"])
+    n_model = len(model.site_properties["coord_atomos"])
+    return {
+        "warnings": warnings,
+        "filename": file.filename,
+        "num_sites": n_other,
+        "site_map": site_map,
+        "method": method,
+        "missing_sites": [i for i, j in enumerate(site_map) if j < 0],
+        "energy_scale": n_model / n_other,
+    }
+
+
+class ImportMapRequest(BaseModel):
+    session_id: str
+    configs_text: str
+    # The site map to use (it can be edited); by default the automatic one.
+    site_map: Optional[list[int]] = None
+    tol: float = 0.1
+
+
+@app.post("/import/map")
+def import_map(req: ImportMapRequest):
+    """
+    Translate configurations of the other model to the session's model.
+    Each site takes the spin of its site in the other model, and the
+    energies are scaled by the ratio of the numbers of sites.
+    Configurations the session's cell cannot represent (not periodic with
+    its lattice) are not translated: they are kept as comments, with the
+    reason, as the lines that are not configurations.
+    """
+    sess = _get_session(req.session_id)
+    model, other = sess["model"], _import_model(sess)
+    n_other = len(other.site_properties["coord_atomos"])
+    scale = len(model.site_properties["coord_atomos"]) / n_other
+    try:
+        with library_warnings() as warnings:
+            # Checks the site map once (sites without counterpart, size).
+            map_configurations(other, [], model, req.tol, mapping=req.site_map)
+            lines, imported, skipped = [], 0, 0
+            for line in req.configs_text.splitlines():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    lines.append(line)
+                    continue
+                try:
+                    energies, confs, comments = parse_spin_configurations(stripped)
+                except ValueError:
+                    lines.append("# not a configuration: " + stripped)
+                    skipped += 1
+                    continue
+                conf, comment = confs[0], comments[0].strip()
+                if len(conf) != n_other:
+                    lines.append(f"# skipped, {len(conf)} values for {n_other} sites: {stripped}")
+                    skipped += 1
+                    continue
+                if not compatible_configurations(other, [conf], model, req.tol)[0]:
+                    lines.append("# skipped, not periodic with the current cell: " + stripped)
+                    skipped += 1
+                    continue
+                (mapped,) = map_configurations(other, [conf], model, req.tol, mapping=req.site_map)
+                energy = energies[0] * scale
+                lines.append(f"{energy}\t{mapped}\t# {comment}".rstrip())
+                imported += 1
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{exc}. Edit the site map, or increase the length tolerance.",
+        )
+    return {
+        "warnings": warnings,
+        "mapped_text": "\n".join(lines).strip("\n") + "\n",
+        "imported": imported,
+        "skipped": skipped,
+        "energy_scale": scale,
+    }
+
+
+@app.get("/import/{session_id}/transformed_model", response_class=PlainTextResponse)
+def import_transformed_model(session_id: str, tol: float = 0.1):
+    """
+    The other model rewritten in the cell and order of sites of the
+    session's model (its own positions and couplings), as a CIF file
+    (spectrojotometer.magnetic_model.equivalent_model).
+    """
+    sess = _get_session(session_id)
+    try:
+        transformed = equivalent_model(_import_model(sess), sess["model"], tol)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    path = TMPDIR / f"{uuid.uuid4()}.cif"
+    transformed.save_cif(str(path))
+    text = path.read_text()
+    path.unlink(missing_ok=True)
+    stem = Path(sess.get("import_name") or "model").stem
+    return PlainTextResponse(
+        text,
+        headers={"Content-Disposition": f'attachment; filename="{stem}_transformed.cif"'},
+    )
+
+
+# ── Monte Carlo simulation ───────────────────────────────────────────────────
+#
+# Simulations run in background threads (they may take from seconds to
+# minutes); the client polls /montecarlo/{job_id}. The total work is
+# limited: sites of the supercell x sweeps x temperatures x restarts.
+
+MC_MAX_SPIN_UPDATES = float(os.environ.get("VISUALBOND_MC_MAX_SPIN_UPDATES", 1e9))
+MC_MAX_RUNNING = int(os.environ.get("VISUALBOND_MC_MAX_RUNNING", 2))
+mc_jobs: dict = {}
+_mc_lock = threading.Lock()
+
+
+def _json_number(x):
+    x = float(x)
+    return x if np.isfinite(x) else None
+
+
+@app.get("/montecarlo/{session_id}/couplings")
+def montecarlo_couplings(session_id: str):
+    """The couplings of the model, with their values as estimated by
+    /evaluate (null if not estimated, or undetermined)."""
+    model = _get_session(session_id)["model"]
+    return {
+        "couplings": [
+            {
+                "name": name,
+                "distance": float(info.get("distance", 0)),
+                "num_bonds": len(info.get("bonds", [])),
+                "value": _json_number(info.get("value", float("nan"))),
+            }
+            for name, info in model.bonds.items()
+        ],
+        "num_sites": len(model.site_properties["coord_atomos"]),
+    }
+
+
+class MonteCarloRequest(BaseModel):
+    session_id: str
+    supercell: list[int] = Field(default=[2, 2, 2], min_length=3, max_length=3)
+    T_min: float = Field(0.5, gt=0)
+    T_max: float = Field(4.0, gt=0)
+    n_temps: int = Field(20, ge=1, le=200)
+    n_equil: int = Field(500, ge=0)
+    n_sweeps: int = Field(2000, ge=1)
+    algorithm: Literal["auto", "metropolis", "wolff", "pt"] = "auto"
+    n_restarts: int = Field(1, ge=1, le=20)
+    seed: Optional[int] = 42
+    # Values of the couplings; by default, the ones estimated by /evaluate.
+    couplings: Optional[dict[str, float]] = None
+
+
+@app.post("/montecarlo/run")
+def montecarlo_run(req: MonteCarloRequest):
+    """
+    Start a Monte Carlo simulation of the Ising model of the session (see
+    spectrojotometer.monte_carlo.run_ising_mc). Returns a job_id; poll
+    /montecarlo/{job_id} for the progress and the results.
+    """
+    sess = _get_session(req.session_id)
+    model = sess["model"]
+    if req.T_max < req.T_min:
+        raise HTTPException(status_code=422, detail="T_max must be at least T_min.")
+    if any(s < 1 or s > 8 for s in req.supercell):
+        raise HTTPException(status_code=422, detail="Each supercell size must be between 1 and 8.")
+    try:
+        with library_warnings() as warnings:
+            spins, bonds, j_vals, e0 = magnetic_model_to_ising(
+                model, tuple(req.supercell), J_overrides=req.couplings or None
+            )
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc).strip("'\""))
+    work = len(spins) * (req.n_equil + req.n_sweeps) * req.n_temps * req.n_restarts
+    if work > MC_MAX_SPIN_UPDATES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"This simulation needs {work:.2g} spin updates; the limit of this "
+                f"server is {MC_MAX_SPIN_UPDATES:.2g}. Use a smaller supercell, "
+                "fewer temperatures or fewer sweeps."
+            ),
+        )
+    with _mc_lock:
+        running = sum(1 for j in mc_jobs.values() if j["status"] == "running")
+        if running >= MC_MAX_RUNNING:
+            raise HTTPException(
+                status_code=429, detail="Too many simulations running; try again later."
+            )
+        job_id = str(uuid.uuid4())
+        job = {
+            "status": "running",
+            "progress": {"done": 0, "total": req.n_temps, "message": "starting"},
+            "results": None,
+            "error": None,
+            "warnings": list(warnings),
+            "cancel": threading.Event(),
+            "session_id": req.session_id,
+        }
+        mc_jobs[job_id] = job
+
+    def progress(done, total, message):
+        job["progress"] = {"done": int(done), "total": int(total), "message": str(message)}
+        if job["cancel"].is_set():
+            raise SimulationCancelled()
+
+    def work_thread():
+        try:
+            with library_warnings() as run_warnings:
+                results = run_ising_mc(
+                    spins, bonds, j_vals, e0, req.T_min, req.T_max, req.n_temps,
+                    n_equil=req.n_equil, n_sweeps=req.n_sweeps,
+                    algorithm=req.algorithm, n_restarts=req.n_restarts,
+                    seed=req.seed, progress_callback=progress,
+                )
+            job["warnings"].extend(run_warnings)
+            job["results"] = {
+                key: (
+                    [_json_number(x) for x in value] if key in (
+                        "T", "E", "M", "M2", "M4", "chi", "chi_connected", "C", "U4"
+                    ) else _json_number(value) if isinstance(value, float)
+                    else value
+                )
+                for key, value in results.items()
+                if key != "curie_weiss"
+            }
+            job["status"] = "done"
+        except SimulationCancelled:
+            job["status"] = "cancelled"
+        except Exception as exc:  # reported to the client
+            job["error"] = f"{type(exc).__name__}: {exc}"
+            job["status"] = "error"
+
+    threading.Thread(target=work_thread, daemon=True).start()
+    logger.info("montecarlo: job %s, %d sites, %.2g spin updates", job_id, len(spins), work)
+    return {"job_id": job_id, "num_sites": len(spins), "warnings": warnings}
+
+
+def _mc_job(job_id: str) -> dict:
+    if job_id not in mc_jobs:
+        raise HTTPException(status_code=404, detail="Unknown simulation.")
+    return mc_jobs[job_id]
+
+
+@app.get("/montecarlo/{job_id}")
+def montecarlo_status(job_id: str):
+    """Progress of a simulation, and its results when it is done."""
+    job = _mc_job(job_id)
+    return {
+        "status": job["status"],
+        "progress": job["progress"],
+        "results": job["results"],
+        "error": job["error"],
+        "warnings": job["warnings"] if job["status"] != "running" else [],
+    }
+
+
+@app.post("/montecarlo/{job_id}/cancel")
+def montecarlo_cancel(job_id: str):
+    """Stop a simulation (after the temperature being simulated)."""
+    job = _mc_job(job_id)
+    job["cancel"].set()
+    return {"status": job["status"]}

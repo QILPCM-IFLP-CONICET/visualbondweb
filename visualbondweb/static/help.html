@@ -591,6 +591,8 @@
       <a class="nav-link" href="#method"><span class="nav-icon">∑</span> The method</a>
       <a class="nav-link nav-sub" href="#method-model">Linear model</a>
       <a class="nav-link nav-sub" href="#method-optconf">Optimal configurations</a>
+      <a class="nav-link nav-sub" href="#method-import">Importing configurations</a>
+      <a class="nav-link nav-sub" href="#method-montecarlo">Monte Carlo</a>
       <a class="nav-link nav-sub" href="#method-errors">Error bounds</a>
       <a class="nav-link" href="#files"><span class="nav-icon">⬗</span> File formats</a>
       <a class="nav-link" href="#statusbar"><span class="nav-icon">≡</span> Status bar &amp; log</a>
@@ -1173,6 +1175,33 @@
           <span class="callout-icon">ℹ</span>
           <span>The <strong>Optimal independent set</strong> button applies the same choice to the configurations you already have — useful when you have more than necessary and want to minimize DFT runs.</span>
         </div>
+
+        <h3 id="method-import">Importing configurations from another model</h3>
+        <p>Configurations computed for another model (a distorted phase, a different cell,
+        a supercell) can be used with the current one: <strong>Load configs from other
+        model</strong> in tab 2. Each site of the current model takes the spin of the site of
+        the other model at the same position, up to a translation of its lattice; if the two
+        models are not described in the same frame (different origin, orientation or choice
+        of cell), the sites are matched by aligning both structures with pymatgen's
+        StructureMatcher. The site map can be edited. The energies are scaled by the ratio of
+        the numbers of sites.</p>
+        <p>When the current cell is smaller than the other one, only the configurations that
+        repeat with the current lattice can be represented; the others are kept as comments,
+        with the reason, instead of being imported as a different configuration.
+        <strong>Export transformed model…</strong> downloads the other model rewritten in the
+        cell and order of sites of the current one, with its own positions and couplings, as
+        a CIF file.</p>
+
+        <h3 id="method-montecarlo">Monte Carlo simulation</h3>
+        <p>Tab 4 simulates the effective model at finite temperature: the Ising model
+        H = E<sub>0</sub> − Σ J<sub>b</sub> s<sub>i</sub>s<sub>j</sub> (s = ±1), the same
+        convention as the fit, on a supercell of the model. The couplings are the ones
+        estimated in tab 3, and can be edited. The algorithm can be Wolff (cluster updates,
+        only for unfrustrated models), Metropolis, or parallel tempering; <em>auto</em> uses
+        Wolff unless the model is frustrated. The results are the energy, magnetization,
+        specific heat, susceptibility and Binder cumulant as functions of the temperature (in
+        the units of J), and T<sub>c</sub> estimated from the peak of the susceptibility. The
+        simulations run on the server, which limits their size.</p>
 
         <h3 id="method-errors">Error bounds on coupling constants</h3>
         <p>Given DFT energies with uncertainty δE, the coupling constants compatible with the

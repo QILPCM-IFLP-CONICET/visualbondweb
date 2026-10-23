@@ -138,6 +138,54 @@ chosen automatically: the smallest set that determines every coupling,
 enlarged while each extra configuration reduces the error bound by at
 least `min_improvement` (5% by default).
 
+### Importing configurations from another model
+
+The configurations computed for another model (e.g. a distorted phase,
+or a different cell) can be translated to the model of the session. In
+the frontend: tab 2, "Load configs from other model".
+
+* `POST /import/model` (form: `session_id`, `file`, `primitive_cell`,
+  `tol` = 0.1): uploads the other model. Returns `site_map` (for each
+  site of the session's model, its site in the other model; -1 if
+  none), `method` (`position`: same frame; `structure`: aligned with
+  pymatgen's StructureMatcher, for a different origin, orientation or
+  cell), `missing_sites`, `energy_scale` (ratio of the numbers of sites)
+  and `warnings`.
+* `POST /import/map` (`session_id`, `configs_text`, `site_map`, `tol`):
+  translates the configurations; the energies are scaled by
+  `energy_scale`. Configurations the session's cell cannot represent
+  (not periodic with its lattice) are kept as comments with the reason.
+  Returns `mapped_text`, `imported`, `skipped`. A site without
+  counterpart is an error (422): edit `site_map`, or increase `tol`.
+* `GET /import/{session_id}/transformed_model` (`tol`): the other model
+  rewritten in the cell and order of sites of the session's model (its
+  own positions and couplings), as a CIF file.
+
+### Monte Carlo: `POST /montecarlo/run`
+
+Simulates the Ising model of the session at finite temperature
+(`spectrojotometer.monte_carlo`). In the frontend: tab 4.
+
+* `GET /montecarlo/{session_id}/couplings`: the couplings, with the
+  values estimated by `/evaluate` (`null` if not estimated).
+* `POST /montecarlo/run` (`session_id`, `supercell` = [2, 2, 2],
+  `T_min`, `T_max`, `n_temps`, `n_equil`, `n_sweeps`, `algorithm` =
+  `auto` | `metropolis` | `wolff` | `pt`, `n_restarts`, `seed`,
+  `couplings`: values to use instead of the estimated ones): starts the
+  simulation in the background and returns its `job_id`.
+* `GET /montecarlo/{job_id}`: `status` (`running`, `done`, `cancelled`,
+  `error`), `progress`, and, when done, `results` (per temperature: `T`,
+  `E`, `M`, `M2`, `M4`, `chi`, `chi_connected`, `C`, `U4`; and
+  `algorithm`, `N`, `frustrated`, `frustration_cycle`, `Tc_peak`,
+  `frustration_factor`).
+* `POST /montecarlo/{job_id}/cancel`: stops it after the temperature
+  being simulated.
+
+The simulations run on the server, so their size is limited:
+`VISUALBOND_MC_MAX_SPIN_UPDATES` (default 1e9: sites of the supercell ×
+sweeps × temperatures × restarts) and `VISUALBOND_MC_MAX_RUNNING`
+(simulations at the same time, default 2), as environment variables.
+
 ### Estimating the couplings: `POST /evaluate`
 
 Fits the coupling constants to the configurations with known energies,

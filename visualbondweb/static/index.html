@@ -426,6 +426,28 @@
     background: var(--bg2);
   }
 
+  /* ─────────────────────────────────────
+     PAGE 4 — Monte Carlo
+  ───────────────────────────────────── */
+  #page4 { flex-direction: row; }
+  .p4-sidebar {
+    width: 240px; flex-shrink: 0; border-right: 1px solid var(--border);
+    background: var(--bg2); display: flex; flex-direction: column;
+    overflow-y: auto;  /* every control reachable in a short window */
+  }
+  .p4-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: auto; }
+  .mc-status { display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); font-size: 11px; color: var(--text2); }
+  .mc-progress { width: 160px; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+  .mc-progress-bar { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+  .mc-plots { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; padding: 12px; }
+  .mc-plot { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; }
+  .mc-plot-title { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  .mc-summary { grid-column: 1 / -1; font-size: 12px; color: var(--text2); }
+  .mc-couplings { width: 100%; font-size: 11px; border-collapse: collapse; }
+  .mc-couplings td { padding: 2px 3px; }
+  .mc-couplings input { width: 74px; }
+
   /* radio group */
   .radio-group { display: flex; flex-direction: column; gap: 6px; }
   .radio-row {
@@ -1074,6 +1096,9 @@
   <div class="tab disabled" id="tab3" onclick="switchTab(3)">
     <span class="tab-num">3</span> Set Energies &amp; Evaluate
   </div>
+  <div class="tab disabled" id="tab4" onclick="switchTab(4)">
+    <span class="tab-num">4</span> Monte Carlo
+  </div>
 </div>
 
 <!-- ═══════════════════ MAIN CONTENT ═══════════════════ -->
@@ -1348,6 +1373,61 @@
     </div>
   </div>
 
+  <!-- ═══════════════════ PAGE 4: MONTE CARLO ═══════════════════ -->
+  <div class="page" id="page4">
+    <div class="p4-sidebar">
+      <div class="panel-label">Supercell</div>
+      <div class="section-block">
+        <div class="field-row">
+          <span class="field-label">Lx, Ly, Lz:</span>
+          <input type="number" id="mc-lx" value="2" min="1" max="8" step="1" style="width:46px">
+          <input type="number" id="mc-ly" value="2" min="1" max="8" step="1" style="width:46px">
+          <input type="number" id="mc-lz" value="2" min="1" max="8" step="1" style="width:46px">
+        </div>
+      </div>
+      <div class="panel-label">Temperatures</div>
+      <div class="section-block">
+        <div class="field-row"><span class="field-label">T min:</span><input type="number" id="mc-tmin" value="0.5" step="0.1"></div>
+        <div class="field-row"><span class="field-label">T max:</span><input type="number" id="mc-tmax" value="4.0" step="0.1"></div>
+        <div class="field-row"><span class="field-label">Number:</span><input type="number" id="mc-nt" value="20" min="1" max="200" step="1"></div>
+      </div>
+      <div class="panel-label">Sweeps</div>
+      <div class="section-block">
+        <div class="field-row"><span class="field-label">Equilibration:</span><input type="number" id="mc-equil" value="500" min="0" step="100"></div>
+        <div class="field-row"><span class="field-label">Measurement:</span><input type="number" id="mc-sweeps" value="2000" min="1" step="100"></div>
+        <div class="field-row"><span class="field-label">Restarts:</span><input type="number" id="mc-restarts" value="1" min="1" max="20" step="1"></div>
+        <div class="field-row"><span class="field-label">Seed:</span><input type="number" id="mc-seed" value="42" step="1"></div>
+      </div>
+      <div class="panel-label">Algorithm</div>
+      <div class="section-block">
+        <div class="radio-group">
+          <label class="radio-row active"><input type="radio" name="mcalg" value="auto" checked> Auto</label>
+          <label class="radio-row"><input type="radio" name="mcalg" value="metropolis"> Metropolis</label>
+          <label class="radio-row"><input type="radio" name="mcalg" value="wolff"> Wolff (unfrustrated)</label>
+          <label class="radio-row"><input type="radio" name="mcalg" value="pt"> Parallel tempering</label>
+        </div>
+      </div>
+      <div class="panel-label">Couplings</div>
+      <div class="section-block">
+        <table class="mc-couplings" id="mcCouplings"><tbody><tr><td>Load a model.</td></tr></tbody></table>
+        <label class="radio-row" style="margin-top:6px"><input type="checkbox" id="mc-autosync" checked> Sync with the model</label>
+        <button class="btn btn-full" onclick="mcRefreshCouplings(true)" style="margin-top:6px">Reset to estimated values</button>
+      </div>
+      <div class="section-block">
+        <button class="btn primary btn-full" id="mcRunBtn" onclick="mcRun()">▶ Run</button>
+        <button class="btn btn-full" id="mcCancelBtn" onclick="mcCancel()" disabled style="margin-top:6px">Cancel</button>
+        <button class="btn btn-full" id="mcSaveBtn" onclick="mcDownload()" disabled style="margin-top:6px">Download results (JSON)</button>
+      </div>
+    </div>
+    <div class="p4-main">
+      <div class="mc-status">
+        <div class="mc-progress"><div class="mc-progress-bar" id="mcProgressBar"></div></div>
+        <span id="mcStatus">Estimate the couplings (tab 3) or type their values, then Run.</span>
+      </div>
+      <div class="mc-plots" id="mcPlots"></div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══════════════════ STATUS / LOG BAR ═══════════════════ -->
@@ -1385,30 +1465,33 @@
     </div>
     <div class="modal-body">
       <div class="section-block" style="background:var(--bg3);border-radius:var(--radius);border:1px solid var(--border);padding:14px">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
           <div>
-            <div class="section-title">Model file</div>
-            <button class="btn" onclick="log('Browse other model…')">Browse…</button>
+            <div class="section-title">Model of the configurations</div>
+            <button class="btn" onclick="document.getElementById('importModelFile').click()">Browse…</button>
+            <input type="file" id="importModelFile" accept=".cif,.struct" style="display:none" onchange="importChooseModel(this)">
+            <label class="radio-row" style="margin-top:4px"><input type="checkbox" id="importPrimitive"> Primitive cell</label>
           </div>
-          <div style="flex:1">
-            <div class="section-title">Site map</div>
-            <input type="text" id="siteMap" style="width:100%" placeholder="e.g. 0, 1, 2, -1, 0">
+          <div style="flex:1;min-width:220px">
+            <div class="section-title">Site map <span id="importInfo" style="font-weight:normal;color:var(--text3)"></span></div>
+            <input type="text" id="siteMap" style="width:100%" placeholder="chosen automatically after loading the model">
           </div>
           <div>
             <div class="section-title">Length tolerance</div>
-            <input type="number" id="importTol" value="0.1" step="0.01">
+            <input type="number" id="importTol" value="0.1" step="0.01" min="0.001">
           </div>
         </div>
       </div>
       <div class="modal-row" style="flex:1;min-height:200px">
         <div class="modal-col">
-          <div class="modal-col-label">Input configurations</div>
-          <textarea class="modal-textarea" id="importInput" placeholder="Paste or load configurations from other model…"></textarea>
-          <button class="btn" onclick="log('Load from file…')" style="margin-top:6px">Load from file…</button>
+          <div class="modal-col-label">Configurations of that model</div>
+          <textarea class="modal-textarea" id="importInput" placeholder="Paste or load the configurations…"></textarea>
+          <button class="btn" onclick="document.getElementById('importConfigsFile').click()" style="margin-top:6px">Load from file…</button>
+          <input type="file" id="importConfigsFile" accept=".spin,.txt,.out,*" style="display:none" onchange="importLoadConfigs(this)">
         </div>
         <div class="modal-col">
-          <div class="modal-col-label">Mapped to main model</div>
-          <textarea class="modal-textarea" id="importOutput" readonly placeholder="Mapped configurations will appear here…" style="opacity:.7"></textarea>
+          <div class="modal-col-label">Mapped to the current model</div>
+          <textarea class="modal-textarea" id="importOutput" readonly placeholder="Mapped configurations will appear here…"></textarea>
         </div>
       </div>
     </div>
@@ -1416,6 +1499,7 @@
       <button class="btn primary" onclick="sendImportToApp()">↗ Send to application</button>
       <div style="display:flex;gap:8px">
         <button class="btn" onclick="mapConfigs()">Map configs</button>
+        <button class="btn" onclick="downloadTransformedModel()" title="That model, in the cell and order of sites of the current one (its positions and couplings), as CIF">Export transformed model…</button>
         <button class="btn" onclick="closeImportModal()">Close</button>
       </div>
     </div>
@@ -1743,6 +1827,7 @@ function switchTab(n) {
 function enableTabs() {
   document.getElementById('tab2').classList.remove('disabled');
   document.getElementById('tab3').classList.remove('disabled');
+  document.getElementById('tab4').classList.remove('disabled');
 }
 
 // ── Log ──
@@ -2186,22 +2271,231 @@ function openImportModal() {
 function closeImportModal() {
   document.getElementById('importModal').classList.remove('open');
 }
-function mapConfigs() {
-  log('Map configurations: energy_scale applied, site map translation done.');
-  const input = document.getElementById('importInput').value;
-  if (!input.trim()) return;
-  document.getElementById('importOutput').value = input
-    .split('\n')
-    .map(l => l.trim().startsWith('#') || l.trim() === '' ? l : '# (mapped) ' + l)
-    .join('\n');
+// ── Import configurations from another model ──
+let importReady = false;
+
+async function importChooseModel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('session_id', sessionId);
+  form.append('file', file);
+  form.append('primitive_cell', document.getElementById('importPrimitive').checked ? 'true' : 'false');
+  form.append('tol', document.getElementById('importTol').value || '0.1');
+  try {
+    const data = await api('POST', '/import/model', form, true);
+    importReady = true;
+    document.getElementById('siteMap').value = data.site_map.join(', ');
+    const how = data.method === 'structure'
+      ? 'aligned with StructureMatcher (different origin, orientation or cell)'
+      : 'by positions';
+    document.getElementById('importInfo').textContent =
+      `— ${data.filename}: ${data.num_sites} sites, ${how}, energy × ${data.energy_scale}`;
+    if (data.missing_sites.length)
+      log('Sites ' + data.missing_sites.join(', ') + ' of the current model have no counterpart in ' +
+          data.filename + ': edit the site map, or increase the tolerance.', 'warn');
+    else log('Site map of ' + data.filename + ' (' + how + '): ' + data.site_map.join(', '));
+  } catch(e) { reportError(e); }
+  input.value = '';
 }
+
+function importLoadConfigs(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const area = document.getElementById('importInput');
+    area.value = (area.value.trim() ? area.value + '\n' : '') + reader.result;
+    if (!importReady) log('Now choose the model of these configurations (Browse…).', 'warn');
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+async function mapConfigs() {
+  if (!importReady) { log('Error: choose the model of the configurations first (Browse…).', 'err'); return; }
+  const text = document.getElementById('importInput').value;
+  if (!text.trim()) { log('Error: no configurations to map.', 'err'); return; }
+  const mapText = document.getElementById('siteMap').value.trim();
+  let site_map = null;
+  if (mapText) {
+    site_map = mapText.split(/[\s,]+/).filter(x => x !== '').map(Number);
+    if (site_map.some(x => !Number.isInteger(x))) { log('Error: the site map must be a list of site indices.', 'err'); return; }
+  }
+  try {
+    const data = await api('POST', '/import/map', {
+      session_id: sessionId, configs_text: text, site_map,
+      tol: parseFloat(document.getElementById('importTol').value) || 0.1,
+    });
+    document.getElementById('importOutput').value = data.mapped_text;
+    log(`Mapped ${data.imported} configurations` + (data.skipped ? `; ${data.skipped} not imported (see the comments).` : '.'),
+        data.skipped ? 'warn' : '');
+  } catch(e) { reportError(e); }
+}
+
+async function downloadTransformedModel() {
+  if (!importReady) { log('Error: choose the model of the configurations first (Browse…).', 'err'); return; }
+  const tol = parseFloat(document.getElementById('importTol').value) || 0.1;
+  try {
+    const r = await fetch(API_BASE + `/import/${sessionId}/transformed_model?tol=${tol}`);
+    if (!r.ok) throw new Error((await r.json()).detail);
+    const name = (r.headers.get('content-disposition') || '').match(/filename="([^"]+)"/);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([await r.text()], {type: 'chemical/x-cif'}));
+    a.download = name ? name[1] : 'transformed.cif';
+    a.click();
+    log('Transformed model exported: ' + a.download);
+  } catch(e) { log('Error: ' + e.message, 'err'); }
+}
+
 function sendImportToApp() {
   const mapped = document.getElementById('importOutput').value;
-  if (mapped.trim()) {
-    setConfigsText(document.getElementById('spinEditor').value + '\n\n# From imported model\n' + mapped + '\n' + '# '.repeat(20) + '\n\n');
-    log('Configurations imported into main application.');
-  }
+  if (!mapped.trim()) { log('Error: map the configurations first (Map configs).', 'err'); return; }
+  setConfigsText(document.getElementById('spinEditor').value + '\n\n# From imported model\n' + mapped + '\n');
+  log('Configurations imported into main application.');
   closeImportModal();
+}
+
+// ── Monte Carlo ──
+let mcJob = null, mcResults = null, mcTimer = null;
+
+async function mcRefreshCouplings(reset) {
+  if (!sessionId || !modelLoaded) return;
+  const table = document.getElementById('mcCouplings');
+  const current = {};
+  table.querySelectorAll('input').forEach(inp => current[inp.dataset.name] = inp.value);
+  try {
+    const data = await api('GET', `/montecarlo/${sessionId}/couplings`);
+    if (!data.couplings.length) { table.innerHTML = '<tbody><tr><td>The model has no couplings.</td></tr></tbody>'; return; }
+    table.innerHTML = '<tbody><tr><td>Name</td><td>d (Å)</td><td>J</td></tr>' + data.couplings.map(c => {
+      const value = (!reset && current[c.name] !== undefined && current[c.name] !== '') ? current[c.name]
+                  : (c.value === null ? '' : String(c.value));
+      return `<tr><td>${c.name}</td><td>${c.distance.toFixed(3)}</td>` +
+             `<td><input type="number" step="any" data-name="${c.name}" value="${value}" placeholder="not estimated"></td></tr>`;
+    }).join('') + '</tbody>';
+  } catch(e) { reportError(e); }
+}
+
+function mcCouplingValues() {
+  const values = {};
+  let missing = [];
+  document.querySelectorAll('#mcCouplings input').forEach(inp => {
+    const v = parseFloat(inp.value);
+    if (Number.isFinite(v)) values[inp.dataset.name] = v; else missing.push(inp.dataset.name);
+  });
+  return {values, missing};
+}
+
+function mcSetRunning(running) {
+  document.getElementById('mcRunBtn').disabled = running;
+  document.getElementById('mcCancelBtn').disabled = !running;
+}
+
+async function mcRun() {
+  if (!sessionId || !modelLoaded) { log('Error: load a model first.', 'err'); return; }
+  const {values, missing} = mcCouplingValues();
+  if (missing.length) {
+    log('Error: the couplings ' + missing.join(', ') + ' have no value: estimate them (tab 3) or type them.', 'err');
+    return;
+  }
+  const num = id => Number(document.getElementById(id).value);
+  const body = {
+    session_id: sessionId,
+    supercell: [num('mc-lx'), num('mc-ly'), num('mc-lz')],
+    T_min: num('mc-tmin'), T_max: num('mc-tmax'), n_temps: num('mc-nt'),
+    n_equil: num('mc-equil'), n_sweeps: num('mc-sweeps'), n_restarts: num('mc-restarts'),
+    seed: num('mc-seed'),
+    algorithm: document.querySelector('input[name="mcalg"]:checked').value,
+    couplings: values,
+  };
+  try {
+    const data = await api('POST', '/montecarlo/run', body);
+    mcJob = data.job_id; mcResults = null;
+    document.getElementById('mcSaveBtn').disabled = true;
+    mcSetRunning(true);
+    log(`Monte Carlo: ${data.num_sites} sites, ${body.n_temps} temperatures.`);
+    mcTimer = setInterval(mcPoll, 500);
+  } catch(e) { reportError(e); }
+}
+
+async function mcPoll() {
+  if (!mcJob) return;
+  try {
+    const data = await api('GET', `/montecarlo/${mcJob}`);
+    const p = data.progress;
+    document.getElementById('mcProgressBar').style.width = (100 * p.done / Math.max(p.total, 1)) + '%';
+    document.getElementById('mcStatus').textContent = `${data.status}: ${p.done}/${p.total} — ${p.message}`;
+    if (data.status === 'running') return;
+    clearInterval(mcTimer); mcTimer = null; mcSetRunning(false);
+    (data.warnings || []).forEach(w => log('spectrojotometer: ' + w, 'warn'));
+    if (data.status === 'done') {
+      mcResults = data.results;
+      document.getElementById('mcSaveBtn').disabled = false;
+      mcRender(mcResults);
+      log('Monte Carlo done (' + mcResults.algorithm + ').');
+    } else if (data.status === 'cancelled') {
+      log('Monte Carlo cancelled.', 'warn');
+    } else {
+      log('Monte Carlo error: ' + data.error, 'err');
+    }
+    mcJob = data.status === 'running' ? mcJob : null;
+  } catch(e) { clearInterval(mcTimer); mcTimer = null; mcSetRunning(false); reportError(e); }
+}
+
+async function mcCancel() {
+  if (!mcJob) return;
+  try { await api('POST', `/montecarlo/${mcJob}/cancel`); log('Cancelling (after the current temperature)…'); }
+  catch(e) { reportError(e); }
+}
+
+function mcDownload() {
+  if (!mcResults) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(mcResults, null, 2)], {type: 'application/json'}));
+  a.download = 'montecarlo.json';
+  a.click();
+}
+
+function mcLinePlot(title, xs, ys, xlabel) {
+  const W = 320, H = 200, L = 46, R = 10, T = 10, B = 30;
+  const pts = xs.map((x, i) => [x, ys[i]]).filter(p => p[1] !== null && Number.isFinite(p[1]));
+  if (!pts.length) return `<div class="mc-plot"><div class="mc-plot-title">${title}</div>(no data)</div>`;
+  const xmin = Math.min(...pts.map(p => p[0])), xmax = Math.max(...pts.map(p => p[0]));
+  let ymin = Math.min(...pts.map(p => p[1])), ymax = Math.max(...pts.map(p => p[1]));
+  if (ymax === ymin) { ymax += 1; ymin -= 1; }
+  const sx = x => L + (W - L - R) * (x - xmin) / Math.max(xmax - xmin, 1e-12);
+  const sy = y => T + (H - T - B) * (1 - (y - ymin) / (ymax - ymin));
+  const path = pts.map((p, i) => (i ? 'L' : 'M') + sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join(' ');
+  const dots = pts.map(p => `<circle cx="${sx(p[0]).toFixed(1)}" cy="${sy(p[1]).toFixed(1)}" r="2.2" fill="var(--accent)"/>`).join('');
+  const fmt = v => Math.abs(v) >= 100 || (Math.abs(v) < 0.01 && v !== 0) ? v.toExponential(1) : v.toPrecision(3);
+  return `<div class="mc-plot"><div class="mc-plot-title">${title}</div>
+    <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+      <line x1="${L}" y1="${H - B}" x2="${W - R}" y2="${H - B}" stroke="var(--border)"/>
+      <line x1="${L}" y1="${T}" x2="${L}" y2="${H - B}" stroke="var(--border)"/>
+      <text x="${L - 4}" y="${T + 8}" font-size="9" text-anchor="end" fill="var(--text3)">${fmt(ymax)}</text>
+      <text x="${L - 4}" y="${H - B}" font-size="9" text-anchor="end" fill="var(--text3)">${fmt(ymin)}</text>
+      <text x="${L}" y="${H - B + 14}" font-size="9" fill="var(--text3)">${fmt(xmin)}</text>
+      <text x="${W - R}" y="${H - B + 14}" font-size="9" text-anchor="end" fill="var(--text3)">${fmt(xmax)}</text>
+      <text x="${(L + W - R) / 2}" y="${H - 4}" font-size="9" text-anchor="middle" fill="var(--text3)">${xlabel}</text>
+      <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>${dots}
+    </svg></div>`;
+}
+
+function mcRender(r) {
+  const tc = r.Tc_peak === null || r.Tc_peak === undefined ? 'not found' : r.Tc_peak.toPrecision(4);
+  const frust = r.frustrated
+    ? `frustrated (odd cycle: ${(r.frustration_cycle || []).slice(0, 6).join(', ')}${(r.frustration_cycle || []).length > 6 ? '…' : ''})`
+    : 'not frustrated';
+  document.getElementById('mcPlots').innerHTML =
+    `<div class="mc-summary">${r.N} sites · algorithm: ${r.algorithm} · ${frust} · ` +
+    `T<sub>c</sub> (peak of χ): ${tc}` +
+    (r.frustration_factor !== null && r.frustration_factor !== undefined ? ` · frustration factor: ${r.frustration_factor.toPrecision(3)}` : '') +
+    `</div>` +
+    mcLinePlot('Energy per site E', r.T, r.E, 'T') +
+    mcLinePlot('Magnetization per site |M|', r.T, r.M, 'T') +
+    mcLinePlot('Specific heat C', r.T, r.C, 'T') +
+    mcLinePlot('Susceptibility χ (connected)', r.T, r.chi_connected, 'T') +
+    mcLinePlot('Binder cumulant U4', r.T, r.U4, 'T');
 }
 
 // ── Search ──
@@ -2323,6 +2617,9 @@ function onEnterTab(newTabId) {
   } else if (newTabId === 'tab3') {
     document.getElementById('energyEditor').value = configsText;
     if (sessionId) debouncedRecalc2();
+  } else if (newTabId === 'tab4') {
+    // The couplings estimated in tab 3 (unless synchronization is off).
+    if (document.getElementById('mc-autosync').checked) mcRefreshCouplings(false);
   }
 }
 
