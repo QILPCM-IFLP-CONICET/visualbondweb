@@ -1,9 +1,15 @@
 """
 Importing configurations from another model, exporting the transformed
-model, and Monte Carlo simulations.
+model, and Monte Carlo simulations (the server builds the lattice; the
+simulation runs in the browser, static/mc_engine.js, checked here with
+Node against the library).
 """
 
-import time
+import itertools
+import json
+import shutil
+import subprocess
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -11,6 +17,8 @@ from fastapi.testclient import TestClient
 
 from spectrojotometer.magnetic_model import MagneticModel
 from spectrojotometer.model_io import magnetic_model_from_file
+from spectrojotometer.monte_carlo import detect_frustration, run_ising_mc
+from spectrojotometer.monte_carlo.adapter import magnetic_model_to_ising
 from visualbondweb import api
 
 client = TestClient(api.app)
@@ -134,16 +142,6 @@ def session_with_couplings(files, value=-1.0):
     return sid
 
 
-def wait(job_id, timeout=120):
-    start = time.time()
-    while time.time() - start < timeout:
-        data = client.get(f"/montecarlo/{job_id}").json()
-        if data["status"] != "running":
-            return data
-        time.sleep(0.2)
-    raise TimeoutError(job_id)
-
-
 def test_couplings_endpoint(files):
     cell, _ = files
     sid = upload(cell)
@@ -155,59 +153,129 @@ def test_couplings_endpoint(files):
     assert all(c["value"] == 0.5 for c in client.get(f"/montecarlo/{sid}/couplings").json()["couplings"])
 
 
-def test_run_a_simulation(files):
-    sid = session_with_couplings(files)
-    res = client.post(
-        "/montecarlo/run",
-        json={"session_id": sid, "supercell": [2, 2, 2], "n_temps": 4,
-              "n_equil": 100, "n_sweeps": 300, "seed": 1},
-    )
+def lattice(sid, **kw):
+    return client.post("/montecarlo/lattice", json={"session_id": sid, **kw})
+
+
+@pytest.mark.parametrize("value", [-1.0, 1.0])
+def test_the_lattice_is_the_one_of_the_library(files, value):
+    sid = session_with_couplings(files, value)
+    res = lattice(sid, supercell=[2, 2, 2])
     assert res.status_code == 200, res.text
-    assert res.json()["num_sites"] == 16
-    data = wait(res.json()["job_id"])
-    assert data["status"] == "done", data
-    results = data["results"]
-    assert len(results["T"]) == 4 and len(results["E"]) == 4
-    assert results["algorithm"] in ("wolff", "metropolis")
-    assert data["progress"]["done"] == data["progress"]["total"] == 4
+    data = res.json()
+    spins, bonds, j_vals, e0 = magnetic_model_to_ising(api.sessions[sid]["model"], (2, 2, 2))
+    assert data["num_sites"] == len(spins) == 16
+    assert data["bonds"] == np.asarray(bonds).tolist()
+    assert data["J"] == pytest.approx(list(j_vals))
+    assert data["E0"] == pytest.approx(e0)
+    frustrated, gauge, cycle = detect_frustration(np.asarray(bonds), np.asarray(j_vals), 16)
+    assert data["frustrated"] == frustrated
+    if frustrated:  # the antiferromagnet of this model
+        assert value < 0 and data["gauge"] is None and len(data["frustration_cycle"]) >= 3
+    else:
+        assert data["gauge"] == list(gauge) and data["frustration_cycle"] is None
 
 
 def test_couplings_override_and_missing_values(files):
     cell, _ = files
     sid = upload(cell)  # no values
-    res = client.post("/montecarlo/run", json={"session_id": sid, "n_temps": 2})
+    res = lattice(sid)
     assert res.status_code == 422 and "no value" in res.json()["detail"]
     names = list(api.sessions[sid]["model"].bonds)
-    res = client.post(
-        "/montecarlo/run",
-        json={"session_id": sid, "n_temps": 2, "n_sweeps": 50, "n_equil": 10,
-              "couplings": {n: 1.0 for n in names}},
-    )
+    res = lattice(sid, couplings={n: 0.25 for n in names})
     assert res.status_code == 200, res.text
-    assert wait(res.json()["job_id"])["status"] == "done"
+    assert set(res.json()["J"]) == {0.25}
 
 
 def test_limits(files, monkeypatch):
     sid = session_with_couplings(files)
-    monkeypatch.setattr(api, "MC_MAX_SPIN_UPDATES", 1000)
-    res = client.post("/montecarlo/run", json={"session_id": sid})
-    assert res.status_code == 422 and "limit" in res.json()["detail"]
-    assert client.post(
-        "/montecarlo/run", json={"session_id": sid, "supercell": [9, 1, 1]}
-    ).status_code == 422
-    assert client.post(
-        "/montecarlo/run", json={"session_id": sid, "T_min": 3, "T_max": 1}
-    ).status_code == 422
+    assert lattice(sid, supercell=[9, 1, 1]).status_code == 422
+    assert lattice(sid, supercell=[0, 1, 1]).status_code == 422
+    # The number of bonds is checked before building the lattice.
+    per_cell = sum(len(b["bonds"]) for b in api.sessions[sid]["model"].bonds.values())
+    monkeypatch.setattr(api, "MC_MAX_BONDS", 8 * per_cell - 1)
+
+    def not_called(*args, **kwargs):
+        raise AssertionError("the lattice was built")
+
+    monkeypatch.setattr(api, "magnetic_model_to_ising", not_called)
+    res = lattice(sid, supercell=[2, 2, 2])
+    assert res.status_code == 422 and "limit of this server" in res.json()["detail"]
 
 
-def test_cancel(files):
+def test_the_lattice_is_compressed(files):
     sid = session_with_couplings(files)
-    res = client.post(
-        "/montecarlo/run",
-        json={"session_id": sid, "supercell": [4, 4, 4], "n_temps": 50,
-              "n_equil": 2000, "n_sweeps": 20000, "algorithm": "metropolis"},
+    res = lattice(sid, supercell=[6, 6, 6])
+    assert res.status_code == 200
+    assert res.headers["content-encoding"] == "gzip"
+
+
+# The JavaScript engine, run by Node on the lattice of the server, against
+# the library on the same lattice.
+
+ENGINE = Path(api.__file__).parent / "static" / "mc_engine.js"
+NODE = shutil.which("node")
+
+
+def run_engine(lattice_data, params, tmp_path):
+    (tmp_path / "lattice.json").write_text(json.dumps(lattice_data))
+    script = (
+        f"const mc = require({json.dumps(str(ENGINE))});"
+        f"const lat = require({json.dumps(str(tmp_path / 'lattice.json'))});"
+        f"console.log(JSON.stringify(mc.runIsingMC(lat, {json.dumps(params)})));"
     )
-    job_id = res.json()["job_id"]
-    client.post(f"/montecarlo/{job_id}/cancel")
-    assert wait(job_id)["status"] == "cancelled"
-    assert client.get("/montecarlo/unknown").status_code == 404
+    out = subprocess.run([NODE, "-e", script], capture_output=True, text=True, check=True, timeout=120)
+    return json.loads(out.stdout)
+
+
+@pytest.mark.skipif(NODE is None, reason="needs Node.js")
+@pytest.mark.parametrize(
+    "value, algorithm, T_min",
+    [
+        (1.0, "auto", 0.5),  # unfrustrated: Wolff
+        # Frustrated: Metropolis, above the temperatures where single flips
+        # get trapped in metastable states (as the library does, with
+        # some seeds, at T < 1), and parallel tempering at any temperature.
+        (-1.0, "auto", 1.5),
+        (-1.0, "pt", 0.5),
+    ],
+)
+def test_the_browser_engine_agrees_with_the_library(files, value, algorithm, T_min, tmp_path):
+    sid = session_with_couplings(files, value)
+    data = lattice(sid, supercell=[2, 2, 2]).json()
+    params = {"T_min": T_min, "T_max": 6.0, "n_temps": 5, "n_equil": 500, "n_sweeps": 100000,
+              "algorithm": algorithm, "seed": 3, "swap_every": 2}
+    out = run_engine(data, params, tmp_path)
+    spins, bonds, j_vals, e0 = magnetic_model_to_ising(api.sessions[sid]["model"], (2, 2, 2))
+    ref = run_ising_mc(spins, bonds, j_vals, e0, T_min, params["T_max"], params["n_temps"],
+                       n_equil=params["n_equil"], n_sweeps=params["n_sweeps"],
+                       algorithm=algorithm, seed=3, swap_every=2)
+    js = out["results"]
+    expected = algorithm if algorithm != "auto" else "metropolis" if data["frustrated"] else "wolff"
+    assert js["algorithm"] == ref["algorithm"] == expected
+    assert bool(out["warnings"]) == (data["frustrated"] and algorithm == "auto")
+    assert js["T"] == pytest.approx(ref["T"])
+    # Against the exact averages of the 16 sites: unbiased...
+    exact = exact_averages(data, js["T"])
+    scale = sum(abs(j) for j in j_vals) / len(spins)
+    assert np.allclose(js["E"], exact["E"], atol=0.02 * scale)
+    assert np.allclose(js["C"], exact["C"], rtol=0.1, atol=0.01)
+    # ... and against the library: the same lattice and conventions.
+    assert np.allclose(js["E"], ref["E"], atol=0.03 * scale)
+    assert np.allclose(js["M"], ref["M"], atol=0.03)
+
+
+def exact_averages(data, temperatures):
+    """Energy and specific heat per site of a small lattice, by enumeration."""
+    n = data["num_sites"]
+    bonds = np.asarray(data["bonds"])
+    states = np.array(list(itertools.product((-1, 1), repeat=n)), dtype=float)
+    energy = data["E0"] - (states[:, bonds[:, 0]] * states[:, bonds[:, 1]]) @ np.asarray(data["J"])
+    out = {"E": [], "C": []}
+    for T in temperatures:
+        w = np.exp(-(energy - energy.min()) / T)
+        w /= w.sum()
+        e1, e2 = w @ energy, w @ energy**2
+        out["E"].append(e1 / n)
+        out["C"].append((e2 - e1 * e1) / (T * T * n))
+    return out

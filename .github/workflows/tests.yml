@@ -43,6 +43,13 @@ jobs:
       - name: Check for syntax errors and undefined names
         run: ruff check --select E9,F63,F7,F82 .
 
+      # Node.js (preinstalled on the runner) runs the Monte Carlo engine of
+      # the browser: its own tests, and in pytest against the library.
+      - name: Run the tests of the Monte Carlo engine (Node.js)
+        run: |
+          node --version
+          node --test tests/js/*.test.js
+
       - name: Run the tests
         run: python -m pytest -ra
 
@@ -63,6 +70,9 @@ jobs:
           done
           curl -sf http://localhost:8000/health
           curl -sf http://localhost:8000/ | grep -q "<title>"
+          # The Monte Carlo tab loads these in a Web Worker.
+          curl -sf http://localhost:8000/static/mc_worker.js | grep -q importScripts
+          curl -sf http://localhost:8000/static/mc_engine.js | grep -q runIsingMC
 
       - name: Server log
         if: always()

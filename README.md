@@ -13,7 +13,11 @@ Python 3.11 or later.
 ```bash
 pip install ".[test]"
 pytest
+node --test tests/js/*.test.js   # the Monte Carlo engine of the browser
 ```
+
+Some tests of `pytest` also run that engine with Node.js (`node`), and are
+skipped without it.
 
 The backend depends on
 [spectrojotometer](https://github.com/QILPCM-IFLP-CONICET/spectrojotometer)
@@ -161,30 +165,35 @@ the frontend: tab 2, "Load configs from other model".
   rewritten in the cell and order of sites of the session's model (its
   own positions and couplings), as a CIF file.
 
-### Monte Carlo: `POST /montecarlo/run`
+### Monte Carlo: `POST /montecarlo/lattice`
 
-Simulates the Ising model of the session at finite temperature
-(`spectrojotometer.monte_carlo`). In the frontend: tab 4.
+Tab 4 simulates the Ising model of the session at finite temperature. The
+simulation runs in the browser, in a Web Worker
+(`visualbondweb/static/mc_engine.js`, a port of
+`spectrojotometer.monte_carlo`: Metropolis with restarts, Wolff and
+parallel tempering, with the same observables, choice of algorithm and
+warnings); the server only builds the lattice of the supercell.
 
 * `GET /montecarlo/{session_id}/couplings`: the couplings, with the
   values estimated by `/evaluate` (`null` if not estimated).
-* `POST /montecarlo/run` (`session_id`, `supercell` = [2, 2, 2],
-  `T_min`, `T_max`, `n_temps`, `n_equil`, `n_sweeps`, `algorithm` =
-  `auto` | `metropolis` | `wolff` | `pt`, `n_restarts`, `seed`,
-  `couplings`: values to use instead of the estimated ones): starts the
-  simulation in the background and returns its `job_id`.
-* `GET /montecarlo/{job_id}`: `status` (`running`, `done`, `cancelled`,
-  `error`), `progress`, and, when done, `results` (per temperature: `T`,
-  `E`, `M`, `M2`, `M4`, `chi`, `chi_connected`, `C`, `U4`; and
-  `algorithm`, `N`, `frustrated`, `frustration_cycle`, `Tc_peak`,
-  `frustration_factor`).
-* `POST /montecarlo/{job_id}/cancel`: stops it after the temperature
-  being simulated.
+* `POST /montecarlo/lattice` (`session_id`, `supercell` = [2, 2, 2],
+  `couplings`: values to use instead of the estimated ones): the Ising
+  model H = E0 − Σ J s_i s_j of the supercell: `num_sites`, `bonds`
+  (pairs of sites), `J`, `E0`, `frustrated`, `frustration_cycle` (an odd
+  cycle of frustrated bonds) and `gauge` (the signs that map an
+  unfrustrated model onto a ferromagnet, for Wolff).
 
-The simulations run on the server, so their size is limited:
-`VISUALBOND_MC_MAX_SPIN_UPDATES` (default 1e9: sites of the supercell ×
-sweeps × temperatures × restarts) and `VISUALBOND_MC_MAX_RUNNING`
-(simulations at the same time, default 2), as environment variables.
+The engine returns, per temperature, `T`, `E`, `M`, `M2`, `M4`, `chi`,
+`chi_connected`, `C`, `U4`; and `algorithm`, `N`, `frustrated`,
+`frustration_cycle`, `Tc_peak`, `frustration_factor` (and
+`swap_acceptance` with parallel tempering, `mean_cluster_size` with
+Wolff). Its random numbers differ from the library's, so the same seed
+gives reproducible results in the browser, but not the same as
+spectrojotometer.
+
+The size of the lattice is limited by the environment variable
+`VISUALBOND_MC_MAX_BONDS` (bonds of the supercell, default 500000),
+checked before building it.
 
 ### Estimating the couplings: `POST /evaluate`
 

@@ -1741,6 +1741,9 @@
 <!-- hidden file input -->
 <input type="file" id="fileInputHidden" accept=".cif,.struct" style="display:none" onchange="loadFileHidden(this)">
 
+<!-- The Monte Carlo engine (tab 4): here only to validate the parameters; the
+     simulation runs in a Web Worker, mc_worker.js. -->
+<script src="/static/mc_engine.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 //  Visualbond — API client
@@ -2357,7 +2360,9 @@ function sendImportToApp() {
 }
 
 // ── Monte Carlo ──
-let mcJob = null, mcResults = null, mcTimer = null;
+// The simulation runs in a Web Worker (static/mc_worker.js); the server
+// only builds the lattice (POST /montecarlo/lattice).
+let mcWorker = null, mcResults = null, mcRunId = 0;
 
 async function mcRefreshCouplings(reset) {
   if (!sessionId || !modelLoaded) return;
@@ -2391,6 +2396,17 @@ function mcSetRunning(running) {
   document.getElementById('mcCancelBtn').disabled = !running;
 }
 
+function mcProgress(done, total, message) {
+  document.getElementById('mcProgressBar').style.width = (100 * done / Math.max(total, 1)) + '%';
+  document.getElementById('mcStatus').textContent = message;
+}
+
+function mcStop() {
+  if (mcWorker) { mcWorker.terminate(); mcWorker = null; }
+  mcRunId++;
+  mcSetRunning(false);
+}
+
 async function mcRun() {
   if (!sessionId || !modelLoaded) { log('Error: load a model first.', 'err'); return; }
   const {values, missing} = mcCouplingValues();
@@ -2399,53 +2415,66 @@ async function mcRun() {
     return;
   }
   const num = id => Number(document.getElementById(id).value);
-  const body = {
-    session_id: sessionId,
-    supercell: [num('mc-lx'), num('mc-ly'), num('mc-lz')],
+  const seedText = document.getElementById('mc-seed').value.trim();
+  const params = {
     T_min: num('mc-tmin'), T_max: num('mc-tmax'), n_temps: num('mc-nt'),
     n_equil: num('mc-equil'), n_sweeps: num('mc-sweeps'), n_restarts: num('mc-restarts'),
-    seed: num('mc-seed'),
+    seed: seedText === '' ? null : Number(seedText),
     algorithm: document.querySelector('input[name="mcalg"]:checked').value,
-    couplings: values,
   };
+  try { MCEngine.validateParams(params); }
+  catch(e) { log('Error: ' + e.message, 'err'); return; }
+  const runId = ++mcRunId;
+  mcResults = null;
+  document.getElementById('mcSaveBtn').disabled = true;
+  mcSetRunning(true);
+  mcProgress(0, 1, 'Building the lattice…');
+  let lattice;
   try {
-    const data = await api('POST', '/montecarlo/run', body);
-    mcJob = data.job_id; mcResults = null;
-    document.getElementById('mcSaveBtn').disabled = true;
-    mcSetRunning(true);
-    log(`Monte Carlo: ${data.num_sites} sites, ${body.n_temps} temperatures.`);
-    mcTimer = setInterval(mcPoll, 500);
-  } catch(e) { reportError(e); }
-}
-
-async function mcPoll() {
-  if (!mcJob) return;
-  try {
-    const data = await api('GET', `/montecarlo/${mcJob}`);
-    const p = data.progress;
-    document.getElementById('mcProgressBar').style.width = (100 * p.done / Math.max(p.total, 1)) + '%';
-    document.getElementById('mcStatus').textContent = `${data.status}: ${p.done}/${p.total} — ${p.message}`;
-    if (data.status === 'running') return;
-    clearInterval(mcTimer); mcTimer = null; mcSetRunning(false);
-    (data.warnings || []).forEach(w => log('spectrojotometer: ' + w, 'warn'));
-    if (data.status === 'done') {
-      mcResults = data.results;
+    lattice = await api('POST', '/montecarlo/lattice', {
+      session_id: sessionId,
+      supercell: [num('mc-lx'), num('mc-ly'), num('mc-lz')],
+      couplings: values,
+    });
+  } catch(e) {
+    if (runId === mcRunId) { mcSetRunning(false); mcProgress(0, 1, 'Error.'); reportError(e); }
+    return;
+  }
+  if (runId !== mcRunId) return;  // cancelled meanwhile
+  log(`Monte Carlo: ${lattice.num_sites} sites, ${lattice.bonds.length} bonds, ${params.n_temps} temperatures (running in this browser).`);
+  mcWorker = new Worker(API_BASE + '/static/mc_worker.js');
+  mcWorker.onmessage = (event) => {
+    const msg = event.data;
+    if (runId !== mcRunId) return;
+    if (msg.type === 'progress') { mcProgress(msg.done, msg.total, `${msg.done}/${msg.total} — ${msg.message}`); return; }
+    mcStop();
+    if (msg.type === 'done') {
+      (msg.warnings || []).forEach(w => log('Monte Carlo: ' + w, 'warn'));
+      mcResults = msg.results;
       document.getElementById('mcSaveBtn').disabled = false;
+      mcProgress(1, 1, 'Done.');
       mcRender(mcResults);
       log('Monte Carlo done (' + mcResults.algorithm + ').');
-    } else if (data.status === 'cancelled') {
-      log('Monte Carlo cancelled.', 'warn');
     } else {
-      log('Monte Carlo error: ' + data.error, 'err');
+      mcProgress(0, 1, 'Error.');
+      log('Monte Carlo error: ' + msg.error, 'err');
     }
-    mcJob = data.status === 'running' ? mcJob : null;
-  } catch(e) { clearInterval(mcTimer); mcTimer = null; mcSetRunning(false); reportError(e); }
+  };
+  mcWorker.onerror = (event) => {
+    if (runId !== mcRunId) return;
+    mcStop();
+    mcProgress(0, 1, 'Error.');
+    log('Monte Carlo error: ' + (event.message || 'the simulation could not start.'), 'err');
+  };
+  mcWorker.postMessage({lattice, params});
 }
 
-async function mcCancel() {
-  if (!mcJob) return;
-  try { await api('POST', `/montecarlo/${mcJob}/cancel`); log('Cancelling (after the current temperature)…'); }
-  catch(e) { reportError(e); }
+function mcCancel() {
+  if (!document.getElementById('mcCancelBtn').disabled) {
+    mcStop();
+    mcProgress(0, 1, 'Cancelled.');
+    log('Monte Carlo cancelled.', 'warn');
+  }
 }
 
 function mcDownload() {

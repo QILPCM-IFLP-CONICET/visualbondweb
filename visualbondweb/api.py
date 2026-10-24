@@ -20,6 +20,7 @@ if not hasattr(np, 'Infinity'):
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -30,7 +31,7 @@ from spectrojotometer.magnetic_model import (
     map_configurations,
     site_maps,
 )
-from spectrojotometer.monte_carlo import SimulationCancelled, run_ising_mc
+from spectrojotometer.monte_carlo import detect_frustration
 from spectrojotometer.monte_carlo.adapter import magnetic_model_to_ising
 from spectrojotometer.model_io import (
     confindex,
@@ -109,6 +110,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# The lattices for the Monte Carlo simulation can take a few megabytes.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # ── In-memory session store ───────────────────────────────────────────────────
 # Maps session_id -> { model, cif_path, configs }
@@ -1003,14 +1006,11 @@ def import_transformed_model(session_id: str, tol: float = 0.1):
 
 # ── Monte Carlo simulation ───────────────────────────────────────────────────
 #
-# Simulations run in background threads (they may take from seconds to
-# minutes); the client polls /montecarlo/{job_id}. The total work is
-# limited: sites of the supercell x sweeps x temperatures x restarts.
+# The simulations run in the browser (static/mc_engine.js, in a Web
+# Worker): the server only builds the lattice of the supercell, which is
+# cheap. Its size is limited before building it, by the number of bonds.
 
-MC_MAX_SPIN_UPDATES = float(os.environ.get("VISUALBOND_MC_MAX_SPIN_UPDATES", 1e9))
-MC_MAX_RUNNING = int(os.environ.get("VISUALBOND_MC_MAX_RUNNING", 2))
-mc_jobs: dict = {}
-_mc_lock = threading.Lock()
+MC_MAX_BONDS = int(float(os.environ.get("VISUALBOND_MC_MAX_BONDS", 500_000)))
 
 
 def _json_number(x):
@@ -1037,34 +1037,36 @@ def montecarlo_couplings(session_id: str):
     }
 
 
-class MonteCarloRequest(BaseModel):
+class LatticeRequest(BaseModel):
     session_id: str
     supercell: list[int] = Field(default=[2, 2, 2], min_length=3, max_length=3)
-    T_min: float = Field(0.5, gt=0)
-    T_max: float = Field(4.0, gt=0)
-    n_temps: int = Field(20, ge=1, le=200)
-    n_equil: int = Field(500, ge=0)
-    n_sweeps: int = Field(2000, ge=1)
-    algorithm: Literal["auto", "metropolis", "wolff", "pt"] = "auto"
-    n_restarts: int = Field(1, ge=1, le=20)
-    seed: Optional[int] = 42
     # Values of the couplings; by default, the ones estimated by /evaluate.
     couplings: Optional[dict[str, float]] = None
 
 
-@app.post("/montecarlo/run")
-def montecarlo_run(req: MonteCarloRequest):
+@app.post("/montecarlo/lattice")
+def montecarlo_lattice(req: LatticeRequest):
     """
-    Start a Monte Carlo simulation of the Ising model of the session (see
-    spectrojotometer.monte_carlo.run_ising_mc). Returns a job_id; poll
-    /montecarlo/{job_id} for the progress and the results.
+    The Ising model of the supercell of the session, for the Monte Carlo
+    simulation that runs in the browser (static/mc_engine.js): its sites,
+    bonds (pairs of sites) and their couplings J, the base energy E0
+    (H = E0 - sum_b J_b s_i s_j), and whether it is frustrated, with an
+    odd cycle of frustrated bonds or the gauge that maps it onto a
+    ferromagnet (see spectrojotometer.monte_carlo).
     """
-    sess = _get_session(req.session_id)
-    model = sess["model"]
-    if req.T_max < req.T_min:
-        raise HTTPException(status_code=422, detail="T_max must be at least T_min.")
+    model = _get_session(req.session_id)["model"]
     if any(s < 1 or s > 8 for s in req.supercell):
         raise HTTPException(status_code=422, detail="Each supercell size must be between 1 and 8.")
+    num_bonds = sum(len(info.get("bonds", [])) for info in model.bonds.values())
+    num_bonds *= int(np.prod(req.supercell))
+    if num_bonds > MC_MAX_BONDS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"This supercell has {num_bonds} bonds; the limit of this server is "
+                f"{MC_MAX_BONDS}. Use a smaller supercell."
+            ),
+        )
     try:
         with library_warnings() as warnings:
             spins, bonds, j_vals, e0 = magnetic_model_to_ising(
@@ -1072,93 +1074,17 @@ def montecarlo_run(req: MonteCarloRequest):
             )
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc).strip("'\""))
-    work = len(spins) * (req.n_equil + req.n_sweeps) * req.n_temps * req.n_restarts
-    if work > MC_MAX_SPIN_UPDATES:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"This simulation needs {work:.2g} spin updates; the limit of this "
-                f"server is {MC_MAX_SPIN_UPDATES:.2g}. Use a smaller supercell, "
-                "fewer temperatures or fewer sweeps."
-            ),
-        )
-    with _mc_lock:
-        running = sum(1 for j in mc_jobs.values() if j["status"] == "running")
-        if running >= MC_MAX_RUNNING:
-            raise HTTPException(
-                status_code=429, detail="Too many simulations running; try again later."
-            )
-        job_id = str(uuid.uuid4())
-        job = {
-            "status": "running",
-            "progress": {"done": 0, "total": req.n_temps, "message": "starting"},
-            "results": None,
-            "error": None,
-            "warnings": list(warnings),
-            "cancel": threading.Event(),
-            "session_id": req.session_id,
-        }
-        mc_jobs[job_id] = job
-
-    def progress(done, total, message):
-        job["progress"] = {"done": int(done), "total": int(total), "message": str(message)}
-        if job["cancel"].is_set():
-            raise SimulationCancelled()
-
-    def work_thread():
-        try:
-            with library_warnings() as run_warnings:
-                results = run_ising_mc(
-                    spins, bonds, j_vals, e0, req.T_min, req.T_max, req.n_temps,
-                    n_equil=req.n_equil, n_sweeps=req.n_sweeps,
-                    algorithm=req.algorithm, n_restarts=req.n_restarts,
-                    seed=req.seed, progress_callback=progress,
-                )
-            job["warnings"].extend(run_warnings)
-            job["results"] = {
-                key: (
-                    [_json_number(x) for x in value] if key in (
-                        "T", "E", "M", "M2", "M4", "chi", "chi_connected", "C", "U4"
-                    ) else _json_number(value) if isinstance(value, float)
-                    else value
-                )
-                for key, value in results.items()
-                if key != "curie_weiss"
-            }
-            job["status"] = "done"
-        except SimulationCancelled:
-            job["status"] = "cancelled"
-        except Exception as exc:  # reported to the client
-            job["error"] = f"{type(exc).__name__}: {exc}"
-            job["status"] = "error"
-
-    threading.Thread(target=work_thread, daemon=True).start()
-    logger.info("montecarlo: job %s, %d sites, %.2g spin updates", job_id, len(spins), work)
-    return {"job_id": job_id, "num_sites": len(spins), "warnings": warnings}
-
-
-def _mc_job(job_id: str) -> dict:
-    if job_id not in mc_jobs:
-        raise HTTPException(status_code=404, detail="Unknown simulation.")
-    return mc_jobs[job_id]
-
-
-@app.get("/montecarlo/{job_id}")
-def montecarlo_status(job_id: str):
-    """Progress of a simulation, and its results when it is done."""
-    job = _mc_job(job_id)
+    bonds = np.asarray(bonds, dtype=np.int64).reshape(-1, 2)
+    j_vals = np.asarray(j_vals, dtype=np.float64)
+    frustrated, gauge, cycle = detect_frustration(bonds, j_vals, len(spins))
+    logger.info("montecarlo: lattice of %d sites, %d bonds", len(spins), len(bonds))
     return {
-        "status": job["status"],
-        "progress": job["progress"],
-        "results": job["results"],
-        "error": job["error"],
-        "warnings": job["warnings"] if job["status"] != "running" else [],
+        "num_sites": len(spins),
+        "bonds": bonds.tolist(),
+        "J": j_vals.tolist(),
+        "E0": float(e0),
+        "frustrated": bool(frustrated),
+        "frustration_cycle": [int(i) for i in cycle] if frustrated and cycle is not None else None,
+        "gauge": None if gauge is None else [int(g) for g in gauge],
+        "warnings": warnings,
     }
-
-
-@app.post("/montecarlo/{job_id}/cancel")
-def montecarlo_cancel(job_id: str):
-    """Stop a simulation (after the temperature being simulated)."""
-    job = _mc_job(job_id)
-    job["cancel"].set()
-    return {"status": job["status"]}

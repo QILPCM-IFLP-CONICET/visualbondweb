@@ -1201,7 +1201,12 @@
         Wolff unless the model is frustrated. The results are the energy, magnetization,
         specific heat, susceptibility and Binder cumulant as functions of the temperature (in
         the units of J), and T<sub>c</sub> estimated from the peak of the susceptibility. The
-        simulations run on the server, which limits their size.</p>
+        server builds the supercell, and the simulation runs in your browser (in the
+        background: the page keeps responding, and Cancel stops it at once). A sweep flips
+        N spins on average: N attempts with Metropolis; with Wolff, as many clusters as
+        needed for N spins at each temperature. With the same seed, the results are
+        reproducible in the browser, but not identical to those of the spectrojotometer
+        library, which uses another random number generator.</p>
 
         <h3 id="method-errors">Error bounds on coupling constants</h3>
         <p>Given DFT energies with uncertainty δE, the coupling constants compatible with the
