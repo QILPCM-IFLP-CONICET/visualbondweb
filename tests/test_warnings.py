@@ -43,24 +43,34 @@ def test_evaluate_reports_incompatible_model():
     assert any("incompatible" in w for w in data["warnings"])
 
 
-def test_upload_reports_library_warnings():
-    path = FIXTURES / "synthetic_mult2.struct"
+def upload(name, primitive_cell=None):
+    path = FIXTURES / name
+    data = {} if primitive_cell is None else {"primitive_cell": str(primitive_cell).lower()}
     with path.open("rb") as f:
-        res = client.post(
-            "/model/upload",
-            files={"file": (path.name, f)},
-            data={"primitive_cell": "true"},
-        )
+        res = client.post("/model/upload", files={"file": (path.name, f)}, data=data)
     assert res.status_code == 200, res.text
-    assert any("primitive_cell=True is not supported" in w for w in res.json()["warnings"])
+    return res.json()
+
+
+def test_upload_reports_library_warnings():
+    """A bond to a symmetry operator that the file does not have is skipped."""
+    data = upload("bad_symmetry_index.cif", primitive_cell=True)
+    assert any("symmetry index 2 in '2_565' is out of range" in w for w in data["warnings"])
+    assert [b["name"] for b in data["bonds"]] == ["J1"]
 
 
 def test_upload_without_warnings():
-    path = FIXTURES / "synthetic_mult2.struct"
-    with path.open("rb") as f:
-        res = client.post("/model/upload", files={"file": (path.name, f)})
-    assert res.status_code == 200, res.text
-    assert res.json()["warnings"] == []
+    data = upload("synthetic_mult2.struct")
+    assert data["warnings"] == []
+
+
+def test_upload_struct_in_the_primitive_cell():
+    """A centred WIEN2k lattice: two sites in the conventional cell, one in the primitive."""
+    conventional = upload("synthetic_bcc.struct", primitive_cell=False)
+    primitive = upload("synthetic_bcc.struct", primitive_cell=True)
+    assert (conventional["num_atoms"], primitive["num_atoms"]) == (2, 1)
+    assert primitive["primitive_cell"] is True
+    assert conventional["warnings"] == primitive["warnings"] == []
 
 
 def test_warnings_of_other_threads_are_not_collected():

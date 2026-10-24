@@ -1,0 +1,29 @@
+# A bond (J2) refers to symmetry operator 2, which this P1 file does not
+# have: with primitive_cell=True the library warns and skips that bond.
+data_bad_symmetry_index
+_symmetry_space_group_name_H-M   'P 1'
+_cell_length_a   5.0
+_cell_length_b   6.0
+_cell_length_c   7.0
+_cell_angle_alpha   90.0
+_cell_angle_beta    90.0
+_cell_angle_gamma   90.0
+loop_
+_symmetry_equiv_pos_site_id
+_symmetry_equiv_pos_as_xyz
+1 'x, y, z'
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Cu1 Cu 0.1 0.2 0.3
+loop_
+_geom_bond_atom_site_label_1
+_geom_bond_atom_site_label_2
+_geom_bond_distance
+_geom_bond_site_symmetry_2
+_geom_bond_label
+Cu1 Cu1 5.0 1_655 J1
+Cu1 Cu1 6.0 2_565 J2

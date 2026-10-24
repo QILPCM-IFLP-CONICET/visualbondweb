@@ -16,7 +16,7 @@ dependencies = [
     "numpy>=1.24",
     # ruamel.yaml is a transitive dep of pymatgen that pip sometimes misses
     "ruamel.yaml>=0.17.0",
-    "spectrojotometer @ git+https://github.com/QILPCM-IFLP-CONICET/spectrojotometer@0e638f3e8f4f67e00f2806dee0724f0788f5475f",
+    "spectrojotometer @ git+https://github.com/QILPCM-IFLP-CONICET/spectrojotometer@7f1c310982ddd284ebb479acd9b388b43d3404ed",
 ]
 
 [project.scripts]
