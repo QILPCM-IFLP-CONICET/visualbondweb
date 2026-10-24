@@ -1398,8 +1398,12 @@
 
         <div class="callout danger">
           <div>
-            <strong>Parse error at line N: expected '&lt;energy&gt; &lt;config&gt;'</strong><br>
-            <span style="color:var(--text2)">A line in the configuration editor is not in the expected format. Check that every non-comment line has an energy (or <code>nan</code>) followed by a bracketed spin list.</span>
+            <strong>Parse error at line N: …</strong><br>
+            <span style="color:var(--text2)">Line N of the configuration editor (counting blank and comment lines) is not in the format
+            <code>&lt;energy&gt; [0, 1, …] # label</code>: <em>invalid energy</em> (it must be a number, or <code>nan</code> if it
+            is not known); <em>expected '&lt;energy&gt; &lt;config&gt;'</em> (there are no <code>0</code>s or <code>1</code>s before
+            the <code>#</code>); or <em>K values for N sites</em> (the configuration is longer than the number of magnetic sites of the
+            model; shorter ones are padded with <code>0</code>).</span>
           </div>
         </div>
 

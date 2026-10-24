@@ -34,6 +34,7 @@ from spectrojotometer.magnetic_model import (
 from spectrojotometer.monte_carlo import detect_frustration
 from spectrojotometer.monte_carlo.adapter import magnetic_model_to_ising
 from spectrojotometer.model_io import (
+    SpinConfigurationError,
     confindex,
     magnetic_model_from_file,
     parse_spin_configurations,
@@ -187,53 +188,22 @@ def _get_session(session_id: str) -> dict:
 
 def _parse_configs(configs_text: str, model) -> tuple[list, list, list]:
     """
-    Parse a .spin text block into (energies, configs, labels).
-    Lines starting with '#' or empty are ignored.
-    Format: <energy|nan>  [0,1,0,...] # label
+    Parse configurations text into (energies, configs, labels), with the
+    reader of spectrojotometer (parse_spin_configurations): one
+    configuration per line, `<energy|nan> [0, 1, 0, ...] # label`, padded
+    to the number of sites of the model. Configurations without a label
+    are labelled by their index (confindex). An invalid line is an error
+    (422) with its number.
     """
-    cell_size = model.lattice_properties["cell_size"]
-    energies, confs, labels = [], [], []
-
-    for lineno, line in enumerate(configs_text.splitlines(), 1):
-        ls = line.strip()
-        if not ls or ls.startswith("#"):
-            continue
-        fields = ls.split(maxsplit=1)
-        if len(fields) < 2:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Parse error at line {lineno}: expected '<energy> <config>'",
-            )
-        try:
-            energy = float(fields[0])
-        except ValueError:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Invalid energy value at line {lineno}: '{fields[0]}'",
-            )
-
-        rest = fields[1].strip()
-        comment = ""
-        newconf = []
-        for pos, ch in enumerate(rest):
-            if ch == "#":
-                comment = rest[pos + 1:].strip()
-                break
-            elif ch == "0":
-                newconf.append(0)
-            elif ch == "1":
-                newconf.append(1)
-
-        while len(newconf) < cell_size:
-            newconf.append(0)
-
-        if not comment:
-            comment = str(confindex(newconf))
-
-        energies.append(energy)
-        confs.append(newconf)
-        labels.append(comment)
-
+    try:
+        energies, confs, labels = parse_spin_configurations(
+            configs_text, model.lattice_properties["cell_size"]
+        )
+    except SpinConfigurationError as exc:
+        raise HTTPException(
+            status_code=422, detail=f"Parse error at line {exc.line}: {exc.reason}"
+        )
+    labels = [label or str(confindex(conf)) for label, conf in zip(labels, confs)]
     return energies, confs, labels
 
 
@@ -828,7 +798,7 @@ def parse_configs(req: EquationsRequest):
         "with_energy": known,
         "without_energy": len(confs) - known,
         "configs": [
-            {"energy": e, "config": c, "label": l}
+            {"energy": _json_number(e), "config": c, "label": l}
             for e, c, l in zip(energies, confs, labels)
         ],
     }
