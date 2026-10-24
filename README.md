@@ -161,9 +161,14 @@ the frontend: tab 2, "Load configs from other model".
   (not periodic with its lattice) are kept as comments with the reason.
   Returns `mapped_text`, `imported`, `skipped`. A site without
   counterpart is an error (422): edit `site_map`, or increase `tol`.
-* `GET /import/{session_id}/transformed_model` (`tol`): the other model
-  rewritten in the cell and order of sites of the session's model (its
-  own positions and couplings), as a CIF file.
+* `GET /import/{session_id}/transformed_model` (`tol`, `site_map`): the
+  other model rewritten in the cell and order of sites of the session's
+  model (its own positions and couplings), as a CIF file. With
+  `site_map` (comma-separated indices, as edited for `/import/map`), its
+  sites follow that map: the same supercell of the other model, in
+  another order, so that the configurations imported with it keep their
+  coefficients. Each site of the other model must appear as many times
+  as the supercell holds it (422 otherwise).
 
 ### Monte Carlo: `POST /montecarlo/lattice`
 

@@ -279,3 +279,55 @@ def exact_averages(data, temperatures):
         out["E"].append(e1 / n)
         out["C"].append((e2 - e1 * e1) / (T * T * n))
     return out
+
+
+def asymmetric_chain(xs, period):
+    """Gaps 0.7, 0.9, 1.4: exchanging two sites is not a symmetry."""
+    model = MagneticModel(
+        [np.array([x, 0.0, 0.0]) for x in xs],
+        [np.array([period, 0.0, 0.0]), np.array([0.0, 5.0, 0.0]), np.array([0.0, 0.0, 5.0])],
+        magnetic_species=["Cr"] * len(xs),
+    )
+    model.generate_bonds(0.02, [[0, 1.5]])
+    return model
+
+
+def test_transformed_model_with_an_edited_site_map(tmp_path):
+    """The exported model follows the edited map, as /import/map (it used
+    the automatic one)."""
+    asymmetric_chain([0, 0.7, 1.6, 3, 3.7, 4.6], 6.0).save_cif(str(tmp_path / "double.cif"))
+    asymmetric_chain([0, 0.7, 1.6], 3.0).save_cif(str(tmp_path / "cell.cif"))
+    sid = upload(tmp_path / "double.cif")
+    assert import_model(sid, tmp_path / "cell.cif").json()["site_map"] == [0, 1, 2, 0, 1, 2]
+    edited = [1, 0, 2, 1, 0, 2]
+    res = client.get(
+        f"/import/{sid}/transformed_model", params={"site_map": ",".join(map(str, edited))}
+    )
+    assert res.status_code == 200, res.text
+    (tmp_path / "out.cif").write_text(res.text)
+    exported = magnetic_model_from_file(str(tmp_path / "out.cif"))
+    source = magnetic_model_from_file(str(tmp_path / "cell.cif"))
+    for conf in ([0, 1, 1], [1, 0, 1], [0, 0, 1]):
+        mapped = client.post(
+            "/import/map",
+            json={"session_id": sid, "configs_text": f"1.0 {conf}", "site_map": edited},
+        ).json()["mapped_text"]
+        mapped_conf = [int(c) for c in mapped.split("[")[1].split("]")[0].split(",")]
+        assert mapped_conf == [conf[j] for j in edited]
+        np.testing.assert_allclose(
+            exported.coefficient_matrix([mapped_conf])[0][:-1],
+            2 * source.coefficient_matrix([conf])[0][:-1],
+        )
+
+
+def test_transformed_model_with_an_invalid_site_map(files):
+    cell, double = files
+    sid = upload(double)
+    import_model(sid, cell)
+    res = client.get(f"/import/{sid}/transformed_model", params={"site_map": "0,0,0,1"})
+    assert res.status_code == 422
+    assert "the cell of the target holds each one 2 times" in res.json()["detail"]
+    res = client.get(f"/import/{sid}/transformed_model", params={"site_map": "0,a,1"})
+    assert res.status_code == 422 and "list of site indices" in res.json()["detail"]
+    # An empty map: the automatic one.
+    assert client.get(f"/import/{sid}/transformed_model", params={"site_map": ""}).status_code == 200

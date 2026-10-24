@@ -1190,7 +1190,10 @@
         with the reason, instead of being imported as a different configuration.
         <strong>Export transformed model…</strong> downloads the other model rewritten in the
         cell and order of sites of the current one, with its own positions and couplings, as
-        a CIF file.</p>
+        a CIF file. If the site map was edited, the exported model follows it, as the imported
+        configurations: each of its sites is the image of the site given by the map closest to
+        its place. For that, the map must give each site of the other model as many times as the
+        current cell holds it (once, for cells of the same size).</p>
 
         <h3 id="method-montecarlo">Monte Carlo simulation</h3>
         <p>Tab 4 simulates the effective model at finite temperature: the Ising model

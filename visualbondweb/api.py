@@ -952,15 +952,32 @@ def import_map(req: ImportMapRequest):
 
 
 @app.get("/import/{session_id}/transformed_model", response_class=PlainTextResponse)
-def import_transformed_model(session_id: str, tol: float = 0.1):
+def import_transformed_model(
+    session_id: str, tol: float = 0.1, site_map: Optional[str] = None
+):
     """
     The other model rewritten in the cell and order of sites of the
     session's model (its own positions and couplings), as a CIF file
     (spectrojotometer.magnetic_model.equivalent_model).
+
+    `site_map`: the site map edited by hand, as comma-separated indices
+    (one site of the other model per site of the session's model), as in
+    /import/map: the sites of the result follow it. By default, the
+    automatic map.
     """
     sess = _get_session(session_id)
+    mapping = None
+    if site_map is not None and site_map.strip():
+        try:
+            mapping = [int(x) for x in site_map.replace(",", " ").split()]
+        except ValueError:
+            raise HTTPException(
+                status_code=422, detail="The site map must be a list of site indices."
+            )
     try:
-        transformed = equivalent_model(_import_model(sess), sess["model"], tol)
+        transformed = equivalent_model(
+            _import_model(sess), sess["model"], tol, mapping=mapping
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     path = TMPDIR / f"{uuid.uuid4()}.cif"

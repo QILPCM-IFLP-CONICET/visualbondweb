@@ -2315,16 +2315,22 @@ function importLoadConfigs(input) {
   input.value = '';
 }
 
+// The site map of the import panel (maybe edited by hand): null if empty.
+// Map configs and Export transformed model use the same one.
+function importSiteMap() {
+  const mapText = document.getElementById('siteMap').value.trim();
+  if (!mapText) return null;
+  const site_map = mapText.split(/[\s,]+/).filter(x => x !== '').map(Number);
+  if (site_map.some(x => !Number.isInteger(x))) throw new Error('the site map must be a list of site indices.');
+  return site_map;
+}
+
 async function mapConfigs() {
   if (!importReady) { log('Error: choose the model of the configurations first (Browse…).', 'err'); return; }
   const text = document.getElementById('importInput').value;
   if (!text.trim()) { log('Error: no configurations to map.', 'err'); return; }
-  const mapText = document.getElementById('siteMap').value.trim();
-  let site_map = null;
-  if (mapText) {
-    site_map = mapText.split(/[\s,]+/).filter(x => x !== '').map(Number);
-    if (site_map.some(x => !Number.isInteger(x))) { log('Error: the site map must be a list of site indices.', 'err'); return; }
-  }
+  let site_map;
+  try { site_map = importSiteMap(); } catch(e) { log('Error: ' + e.message, 'err'); return; }
   try {
     const data = await api('POST', '/import/map', {
       session_id: sessionId, configs_text: text, site_map,
@@ -2340,8 +2346,16 @@ async function downloadTransformedModel() {
   if (!importReady) { log('Error: choose the model of the configurations first (Browse…).', 'err'); return; }
   const tol = parseFloat(document.getElementById('importTol').value) || 0.1;
   try {
-    const r = await fetch(API_BASE + `/import/${sessionId}/transformed_model?tol=${tol}`);
-    if (!r.ok) throw new Error((await r.json()).detail);
+    const site_map = importSiteMap();
+    const query = `tol=${tol}` + (site_map ? `&site_map=${site_map.join(',')}` : '');
+    const r = await fetch(API_BASE + `/import/${sessionId}/transformed_model?${query}`);
+    if (!r.ok) {
+      // The detail of an error of the API; other errors may not be JSON.
+      const body = await r.text();
+      let detail = `${r.status} ${r.statusText}`;
+      try { detail = JSON.parse(body).detail || detail; } catch(_) {}
+      throw new Error(detail);
+    }
     const name = (r.headers.get('content-disposition') || '').match(/filename="([^"]+)"/);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([await r.text()], {type: 'chemical/x-cif'}));
