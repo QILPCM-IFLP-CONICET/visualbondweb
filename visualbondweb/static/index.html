@@ -1480,6 +1480,7 @@
       <button class="btn primary" onclick="sendImportToApp()">↗ Send to application</button>
       <div style="display:flex;gap:8px">
         <button class="btn" onclick="mapConfigs()">Map configs</button>
+        <label class="radio-row" title="Move the exported model rigidly onto the current one, each site at the image closest to its site, instead of in its own frame and wrapped into the cell: each bond of the current model is then the same bond in it"><input type="checkbox" id="importAlign"> Align onto the current model</label>
         <button class="btn" onclick="downloadTransformedModel()" title="That model, in the cell and order of sites of the current one (its positions and couplings), as CIF">Export transformed model…</button>
         <button class="btn" onclick="closeImportModal()">Close</button>
       </div>
@@ -2317,7 +2318,9 @@ async function downloadTransformedModel() {
   const tol = parseFloat(document.getElementById('importTol').value) || 0.1;
   try {
     const site_map = importSiteMap();
-    const query = `tol=${tol}` + (site_map ? `&site_map=${site_map.join(',')}` : '');
+    const align = document.getElementById('importAlign').checked;
+    const query = `tol=${tol}` + (site_map ? `&site_map=${site_map.join(',')}` : '')
+      + (align ? '&align=true' : '');
     const r = await fetch(API_BASE + `/import/${sessionId}/transformed_model?${query}`);
     if (!r.ok) {
       // The detail of an error of the API; other errors may not be JSON.
@@ -2331,7 +2334,7 @@ async function downloadTransformedModel() {
     a.href = URL.createObjectURL(new Blob([await r.text()], {type: 'chemical/x-cif'}));
     a.download = name ? name[1] : 'transformed.cif';
     a.click();
-    log('Transformed model exported: ' + a.download);
+    log('Transformed model exported' + (align ? ', aligned onto the current one' : '') + ': ' + a.download);
   } catch(e) { log('Error: ' + e.message, 'err'); }
 }
 

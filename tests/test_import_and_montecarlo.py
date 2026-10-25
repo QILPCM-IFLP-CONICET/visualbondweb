@@ -130,6 +130,77 @@ def test_transformed_model(files, tmp_path):
     assert client.get(f"/import/{sid_small}/transformed_model").status_code == 422
 
 
+def test_transformed_model_aligned(tmp_path):
+    """align=true: the other model is moved onto the session's model,
+    each site at the image closest to its site, so each bond of the
+    session's model is the same bond in it. Here the session has a
+    centred square lattice (4 x 4 x 6 A, two sites, the second one stored
+    outside the cell, at (-2, 2, 0), as after a symmetry expansion) and
+    the other model its primitive cell (2.83 x 2.83 x 6 A, one site,
+    another origin): read from a CIF, with a along x, it is rotated 45
+    degrees with respect to the session, as the tetragonal cell of a
+    spinel with respect to the cubic one, and StructureMatcher aligns
+    them. Without align, the sites are wrapped into the cell.
+
+    The CIF keeps the cell parameters, not their orientation: read back,
+    a lies along x whatever the frame of the export. What align changes
+    in the file is the origin and the image of each site."""
+    from spectrojotometer.tools import unpack_offset
+
+    square = MagneticModel(
+        [np.zeros(3), np.array([-2.0, 2.0, 0.0])],
+        [np.array([4.0, 0, 0]), np.array([0, 4.0, 0]), np.array([0, 0, 6.0])],
+        magnetic_species=["Cr", "Cr"],
+    )
+    square.generate_bonds(0.02, [[0, 3.0]])
+    side = 2 * np.sqrt(2)
+    primitive = MagneticModel(
+        [np.array([0.13 * side, 0.21 * side, 0.07 * 6])],
+        [np.array([side, 0, 0]), np.array([0, side, 0]), np.array([0, 0, 6.0])],
+        magnetic_species=["Cr"],
+    )
+    primitive.generate_bonds(0.02, [[0, 3.0]])
+    session_file, other = tmp_path / "square.cif", tmp_path / "primitive.cif"
+    square.save_cif(str(session_file))
+    primitive.save_cif(str(other))
+    sid = upload(session_file)
+    imported = import_model(sid, other).json()
+    assert imported["method"] == "structure"
+    session = api.sessions[sid]["model"]
+    targets = np.array(session.site_properties["coord_atomos"], dtype=float)
+    np.testing.assert_allclose(targets[1], [-2, 2, 0], atol=1e-6)  # kept outside
+
+    def exported(**params):
+        res = client.get(f"/import/{sid}/transformed_model", params=params)
+        assert res.status_code == 200, res.text
+        path = tmp_path / "out.cif"
+        path.write_text(res.text)
+        model = magnetic_model_from_file(str(path))
+        positions = np.array(model.site_properties["coord_atomos"], dtype=float)
+        return res, model, np.linalg.norm(positions - targets, axis=1)
+
+    res, _, distances = exported()
+    assert "primitive_transformed.cif" in res.headers["content-disposition"]
+    assert distances.max() > 0.5
+    res, model, distances = exported(align="true")
+    assert "primitive_aligned.cif" in res.headers["content-disposition"]
+    np.testing.assert_allclose(distances, 0, atol=1e-3)
+    positions = np.array(model.site_properties["coord_atomos"], dtype=float)
+    lattice = np.array(model.lattice_properties["bravais_vectors"], dtype=float)
+    session_lattice = np.array(session.lattice_properties["bravais_vectors"], dtype=float)
+    np.testing.assert_allclose(lattice, session_lattice, atol=1e-3)
+    assert session.bonds
+    for coupling in session.bonds.values():
+        for i, j, tag in coupling["bonds"]:
+            ours = np.linalg.norm(targets[j] + unpack_offset(tag) @ lattice - targets[i])
+            theirs = np.linalg.norm(positions[j] + unpack_offset(tag) @ lattice - positions[i])
+            assert theirs == pytest.approx(ours, abs=1e-3)
+    # With the site map given explicitly (the automatic one, written out).
+    site_map = ",".join(str(s) for s in imported["site_map"])
+    _, _, distances = exported(align="true", site_map=site_map)
+    np.testing.assert_allclose(distances, 0, atol=1e-3)
+
+
 # ── Monte Carlo ──────────────────────────────────────────────────────────────
 
 

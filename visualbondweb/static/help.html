@@ -1171,6 +1171,12 @@
         configurations: each of its sites is the image of the site given by the map closest to
         its place. For that, the map must give each site of the other model as many times as the
         current cell holds it (once, for cells of the same size).</p>
+        <p>With <strong>Align onto the current model</strong> checked, the exported model is moved
+        rigidly onto the current one, and each of its sites is the image closest to the site of the
+        current model it stands for, instead of being wrapped into the cell. Each bond of the current
+        model (its two sites and the cell of the second one) is then the same bond in the exported
+        model: for example, to compare the bond lengths of a relaxed or distorted cell with those of
+        the current one. The file is named <code>…_aligned.cif</code>.</p>
 
         <h3 id="method-montecarlo">Monte Carlo simulation</h3>
         <p>Tab 4 simulates the effective model at finite temperature: the Ising model

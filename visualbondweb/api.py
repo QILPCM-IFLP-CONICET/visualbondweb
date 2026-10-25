@@ -955,7 +955,7 @@ def import_map(req: ImportMapRequest):
 
 @app.get("/import/{session_id}/transformed_model", response_class=PlainTextResponse)
 def import_transformed_model(
-    session_id: str, tol: float = 0.1, site_map: Optional[str] = None
+    session_id: str, tol: float = 0.1, site_map: Optional[str] = None, align: bool = False
 ):
     """
     The other model rewritten in the cell and order of sites of the
@@ -966,6 +966,13 @@ def import_transformed_model(
     (one site of the other model per site of the session's model), as in
     /import/map: the sites of the result follow it. By default, the
     automatic map.
+
+    `align`: if true, the result is moved rigidly onto the session's
+    model (rotated and translated), each site at the image closest to its
+    site of the session's model, instead of in the frame of the other
+    model and wrapped into the cell (equivalent_model(..., align=True)):
+    each bond (i, j, cell shift) of the session's model is then the same
+    bond in the result. The file is named `<model>_aligned.cif`.
     """
     sess = _get_session(session_id)
     mapping = None
@@ -978,7 +985,7 @@ def import_transformed_model(
             )
     try:
         transformed = equivalent_model(
-            _import_model(sess), sess["model"], tol, mapping=mapping
+            _import_model(sess), sess["model"], tol, mapping=mapping, align=align
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -989,7 +996,11 @@ def import_transformed_model(
     stem = Path(sess.get("import_name") or "model").stem
     return PlainTextResponse(
         text,
-        headers={"Content-Disposition": f'attachment; filename="{stem}_transformed.cif"'},
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{stem}_{"aligned" if align else "transformed"}.cif"'
+            )
+        },
     )
 
 

@@ -194,7 +194,16 @@ the frontend: tab 2, "Load configs from other model".
   sites follow that map: the same supercell of the other model, in
   another order, so that the configurations imported with it keep their
   coefficients. Each site of the other model must appear as many times
-  as the supercell holds it (422 otherwise).
+  as the supercell holds it (422 otherwise). With `align=true`, the
+  model is moved rigidly onto the session's model, each site at the
+  image closest to its site of the session's model, instead of in the
+  frame of the other model and wrapped into the cell
+  (`equivalent_model(..., align=True)`): each bond (i, j, cell shift) of
+  the session's model is then the same bond in it, e.g. to compare the
+  bond lengths of a distorted phase with those of the session's model.
+  The file is then `<model>_aligned.cif` instead of
+  `<model>_transformed.cif`. In the frontend, "Align onto the current
+  model", next to "Export transformed model…".
 
 ### Monte Carlo: `POST /montecarlo/lattice`
 
