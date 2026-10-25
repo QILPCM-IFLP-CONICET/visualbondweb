@@ -26,7 +26,10 @@ bound of a set of configurations), installed from git and pinned to a
 specific commit in `requirements.txt` and `pyproject.toml`
 (`spectrojotometer @ git+https://...spectrojotometer@<sha>`), so that a
 change in the library reaches the server only through an explicit
-update, tested by the CI.
+update, tested by the CI. The current pin, `6448ef4`, is needed for the
+bonds across cells in the CIF text of a session (see *Bonds and
+configurations*) and for "Add bonds" pressed again; with an earlier
+commit, `tests/test_cif_bonds.py` fails.
 
 ## Frontend
 
@@ -115,8 +118,27 @@ response only gets the warnings emitted while serving that request
 cell, once. Its `supercell_size` is accepted and ignored: it only
 limited the cells searched for neighbours (and bonds were missed); it
 never built a supercell. A range that needs cell offsets beyond -5..4
-is an error (422). `POST /configs/parse` and the download endpoints
-handle the configuration files; see their docstrings under `/docs`.
+is an error (422). Calling it again adds only the bonds the couplings do
+not have yet (with spectrojotometer before 6448ef4, pressing "Add bonds"
+twice added every bond a second time, doubling its coefficients).
+`POST /configs/parse` and the download endpoints handle the
+configuration files; see their docstrings under `/docs`.
+
+The model of a session is kept as a CIF file (`cif_text`, the download,
+the transformed model of the import), and read back whenever its text is
+edited (`/model/{session_id}/validate`, `/model/{session_id}/cif`). A bond
+to a site in another cell is written with the standard CIF code
+`_geom_bond_site_symmetry_2` = `n_klm`: the identity operator `n` and the
+cell shift + 5 along each axis (`1_655` for one cell along a, `1_545` for
+one cell back along b). CIF files written by earlier versions (by
+spectrojotometer before 6448ef4, or downloaded from this server before
+this update), with the shift itself in each digit (`1_100`), are still
+read, with a warning in `warnings`; the text of the session is then in
+the standard convention. With those versions, editing the CIF text moved
+such bonds 4 or 5 cells away (69.7 Å instead of 2.94 Å in a spinel):
+the fits were right, since they only depend on the sites of each bond,
+but not the bonds of the model, the Monte Carlo lattice built from them,
+or the CIF downloaded afterwards.
 
 Three endpoints report the **error bound** of a set of configurations,
 `error_bound`: the largest error of a coupling per unit error in the

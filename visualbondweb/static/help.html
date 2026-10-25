@@ -812,7 +812,8 @@
 
         <p>Press <strong>⬡ Add bonds</strong> to run the bond search. The CIF text in the editor
         is updated with the new bond information, and the status bar shows the number of bond types
-        found.</p>
+        found. The new bonds are added to the ones the model already has; pressing it again with
+        the same range does not add them twice.</p>
 
         <div class="callout warn">
           <span class="callout-icon">⚠</span>
@@ -830,6 +831,15 @@
           <li><strong>Save</strong> — download the current CIF as <code>model.cif</code>.</li>
           <li>A line count indicator on the right.</li>
         </ul>
+
+        <p>Each bond is a line of the <code>_geom_bond</code> loop: the labels of its two sites,
+        its length, the name of its coupling, and, when the second site is in another cell, the
+        standard CIF code of that cell in <code>_geom_bond_site_symmetry_2</code>:
+        <code>1_klm</code>, each digit the shift along a, b and c plus 5 (<code>1_655</code>
+        is one cell along a, <code>1_545</code> one cell back along b, <code>.</code> the same
+        cell). Files written by earlier versions of Visualbond or spectrojotometer give the shift
+        itself in each digit (<code>1_100</code>); they are still read, with a warning in the log,
+        and the editor then shows the standard codes.</p>
 
         <div class="callout info">
           <span class="callout-icon">ℹ</span>

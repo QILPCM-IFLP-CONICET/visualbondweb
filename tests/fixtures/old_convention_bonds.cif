@@ -1,0 +1,37 @@
+# A simple cubic Cu cell (a = 2.5 A) with its three nearest-neighbour
+# bonds, each to the next cell along one axis, written as spectrojotometer
+# wrote them before 6448ef4: the cell shift itself in each digit (1_100),
+# instead of the standard CIF code (1_655).
+
+data_old_convention
+
+_chemical_name_common                  old_convention
+_cell_length_a 			2.5
+_cell_length_b 			2.5
+_cell_length_c 			2.5
+_cell_angle_alpha 			90.0
+_cell_angle_beta 			90.0
+_cell_angle_gamma 			90.0
+
+loop_
+ _space_group_symop_operation_xyz
+'x, y, z'
+
+loop_
+_atom_site_label
+_atom_site_occupancy
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_type_symbol
+Cu1	 1.	0.0	0.0	0.0	Cu
+
+loop_
+_geom_bond_atom_site_label_1
+_geom_bond_atom_site_label_2
+_geom_bond_distance
+_geom_bond_label
+_geom_bond_site_symmetry_2
+Cu1	Cu1	2.5	J1	1_100
+Cu1	Cu1	2.5	J1	1_010
+Cu1	Cu1	2.5	J1	1_001

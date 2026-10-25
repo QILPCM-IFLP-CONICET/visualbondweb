@@ -126,7 +126,8 @@ def test_incompatible_model(session):
     assert all(bars(data)[n]["incompatible"] for n in NAMES)
 
 
-# /model/add_bonds: every bond within the range (spectrojotometer fdf406e).
+# /model/add_bonds: every bond within the range (since spectrojotometer
+# fdf406e; see also test_cif_bonds.py).
 
 def add_bonds(sid, **params):
     return client.post("/model/add_bonds", json={"session_id": sid, **params})
