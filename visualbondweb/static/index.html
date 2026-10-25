@@ -1124,25 +1124,6 @@
         </label>
 	
       </div>      
-      <!-- Grow Lattice: controls supercell_size for generate_bonds -->
-      <div class="panel-label">Grow lattice <button class="help-btn" style="margin-left:4px" onclick="showHelpPopover(this,'supercell')">?</button></div>
-      <div class="section-block">
-        <div class="field-row">
-          <span class="field-label">Lx:</span>
-          <input type="number" id="p1-lx" value="1" min="1" step="1">
-        </div>
-        <div class="field-row">
-          <span class="field-label">Ly:</span>
-          <input type="number" id="p1-ly" value="1" min="1" step="1">
-        </div>
-        <div class="field-row">
-          <span class="field-label">Lz:</span>
-          <input type="number" id="p1-lz" value="1" min="1" step="1">
-        </div>
-        <button class="btn btn-full" onclick="addBonds()">
-          ↗ Apply &amp; grow
-        </button>
-      </div>
       <!-- Add Bonds -->
       <div class="panel-label">Add bonds</div>
       <div class="section-block">
@@ -1588,14 +1569,6 @@
         <span>This is especially useful for centered lattices such as F, I, C, A, or B. Enabling the option reduces the number of sites and therefore the search space when enumerating spin configurations.Disabling it allows configurations that break the cell symmetry, but it requires working with more atoms.</span>
       </div>
 
-      <h3>Grow lattice (supercell)</h3>
-      <p>Lx / Ly / Lz expand the primitive cell before bond generation. Use a supercell when spin configurations span more than one unit cell.</p>
-      <div class="help-callout tip">
-        <span>✦</span>
-        <span>Start with 1×1×1. Enlarge it only if the optimizer reports a large error bound |ΔJ|/|ΔE| (or ∞: some couplings cannot be determined) after generating configurations.</span>
-      </div>
-
-      
       <h3>Add bonds parameters</h3>
       <table class="help-param-table">
         <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
@@ -1955,13 +1928,10 @@ async function addBonds() {
   const rmin  = parseFloat(document.getElementById('p1-rmin').value);
   const rmax  = parseFloat(document.getElementById('p1-rmax').value);
   const discr = parseFloat(document.getElementById('p1-discr').value);
-  const lx    = parseInt(document.getElementById('p1-lx').value) || 1;
-  const ly    = parseInt(document.getElementById('p1-ly').value) || 1;
-  const lz    = parseInt(document.getElementById('p1-lz').value) || 1;
-  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr + ' supercell=[' + [lx,ly,lz] + ']');
+  log('add_bonds: rmin=' + rmin + ' rmax=' + rmax + ' discr=' + discr);
   try {
     const data = await api('POST', '/model/add_bonds', {
-      session_id: sessionId, rmin, rmax, discretization: discr, supercell_size: [lx, ly, lz]
+      session_id: sessionId, rmin, rmax, discretization: discr
     });
     document.getElementById('modelEditor').value = data.cif_text;
     lastSyncedCifText = data.cif_text.trim();
@@ -2871,12 +2841,6 @@ const HELP_TIPS = {
     label: 'Discretization (Å)',
     def: 'Default: 0.02',
     text: 'Resolution for grouping bond lengths. Two bonds differing by less than this value are treated as equivalent.',
-    section: 'tab1'
-  },
-  supercell: {
-    label: 'Grow lattice',
-    def: 'Default: 1×1×1',
-    text: 'Expands the primitive cell before bond generation. Use a supercell when configurations must span more than one unit cell.',
     section: 'tab1'
   },
   primcell: {

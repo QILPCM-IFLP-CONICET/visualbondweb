@@ -136,7 +136,9 @@ class AddBondsRequest(BaseModel):
     rmin: float = 0.0
     rmax: float = 4.9
     discretization: float = 0.02
-    supercell_size: list[int] = [1, 1, 1]
+    # Ignored: generate_bonds searches every cell within the range (it
+    # only limited that search; it never built a supercell).
+    supercell_size: Optional[list[int]] = None
 
 
 class OptimizeConfigsRequest(BaseModel):
@@ -483,12 +485,12 @@ def add_bonds(req: AddBondsRequest):
         raise HTTPException(status_code=400, detail="No model loaded in session.")
 
     try:
-        # Pass a per-axis list; the library clamps each value to 1–4
-        model.lattice_properties["supercell_size"] = req.supercell_size
         model.generate_bonds(
             ranges=[[req.rmin, req.rmax]],
             discretization=req.discretization,
         )
+    except ValueError as exc:  # e.g. a range too long for the cell
+        raise HTTPException(status_code=422, detail=f"Bond generation failed: {exc}")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Bond generation failed: {exc}")
 

@@ -574,7 +574,6 @@
       <a class="nav-link nav-sub" href="#tab1-load">Loading a file</a>
       <a class="nav-link nav-sub" href="#tab1-primitive">Primitive cell</a>
       <a class="nav-link nav-sub" href="#tab1-bonds">Adding bonds</a>
-      <a class="nav-link nav-sub" href="#tab1-lattice">Growing the lattice</a>
       <a class="nav-link nav-sub" href="#tab1-editor">CIF editor</a>
       <a class="nav-link" href="#tab2"><span class="nav-icon">2</span> Spin Configurations</a>
       <a class="nav-link nav-sub" href="#tab2-format">Spin config format</a>
@@ -653,7 +652,7 @@
           <div class="wf-step tab1">
             <span class="wf-num">TAB 1</span>
             <span class="wf-label">Define Model</span>
-            <span class="wf-sub">Load .cif / .struct<br>set bonds &amp; supercell</span>
+            <span class="wf-sub">Load .cif / .struct<br>set bonds</span>
           </div>
           <div class="wf-step tab2">
             <span class="wf-num">TAB 2</span>
@@ -818,38 +817,6 @@
         <div class="callout warn">
           <span class="callout-icon">⚠</span>
           <span><strong>No bonds defined?</strong> Tabs 2 and 3 will still be accessible, but the Optimize and Evaluate operations will refuse to run. Always add bonds before proceeding.</span>
-        </div>
-
-        <h3 id="tab1-lattice">Growing the lattice (supercell)</h3>
-        <p>The <strong>Grow lattice</strong> panel lets you expand the primitive cell into a supercell
-        before bond generation. This is necessary when the spin configurations you need span more
-        than one unit cell.</p>
-
-        <table class="field-table">
-          <tr><th>Parameter</th><th>Default</th><th>Description</th></tr>
-          <tr>
-            <td class="field-name">Lx</td>
-            <td class="field-default">1</td>
-            <td class="field-desc">Repetitions along the <em>a</em> lattice vector.</td>
-          </tr>
-          <tr>
-            <td class="field-name">Ly</td>
-            <td class="field-default">1</td>
-            <td class="field-desc">Repetitions along the <em>b</em> lattice vector.</td>
-          </tr>
-          <tr>
-            <td class="field-name">Lz</td>
-            <td class="field-default">1</td>
-            <td class="field-desc">Repetitions along the <em>c</em> lattice vector.</td>
-          </tr>
-        </table>
-
-        <p>Press <strong>↗ Apply &amp; grow</strong> (or equivalently <strong>Add bonds</strong>
-        with the supercell values set) to regenerate bonds on the expanded cell.</p>
-
-        <div class="callout tip">
-          <span class="callout-icon">✦</span>
-          <span><strong>Tip:</strong> A 2×2×1 supercell doubles the number of independent sites and therefore allows more complex (longer-wavelength) spin patterns. Start with 1×1×1 and only enlarge if the optimizer reports a poor condition number.</span>
         </div>
 
         <h3 id="tab1-editor">CIF editor</h3>

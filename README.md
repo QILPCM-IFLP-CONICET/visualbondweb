@@ -110,9 +110,13 @@ response only gets the warnings emitted while serving that request
 
 ### Bonds and configurations
 
-`POST /model/add_bonds` generates the couplings of the model, and
-`POST /configs/parse` and the download endpoints handle the
-configuration files; see their docstrings under `/docs`.
+`POST /model/add_bonds` generates the couplings of the model (`rmin`,
+`rmax`, `discretization`): every pair of sites within the range, in any
+cell, once. Its `supercell_size` is accepted and ignored: it only
+limited the cells searched for neighbours (and bonds were missed); it
+never built a supercell. A range that needs cell offsets beyond -5..4
+is an error (422). `POST /configs/parse` and the download endpoints
+handle the configuration files; see their docstrings under `/docs`.
 
 Three endpoints report the **error bound** of a set of configurations,
 `error_bound`: the largest error of a coupling per unit error in the

@@ -1,6 +1,8 @@
 """Tests for the /evaluate endpoint."""
 
+import itertools
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -122,3 +124,54 @@ def test_incompatible_model(session):
     data = evaluate(session, text).json()
     assert data["incompatible"]
     assert all(bars(data)[n]["incompatible"] for n in NAMES)
+
+
+# /model/add_bonds: every bond within the range (spectrojotometer fdf406e).
+
+def add_bonds(sid, **params):
+    return client.post("/model/add_bonds", json={"session_id": sid, **params})
+
+
+def upload_fixture(name, primitive_cell):
+    path = Path(__file__).parent / "fixtures" / name
+    with path.open("rb") as f:
+        res = client.post(
+            "/model/upload",
+            files={"file": (path.name, f)},
+            data={"primitive_cell": str(primitive_cell).lower()},
+        )
+    assert res.status_code == 200, res.text
+    return res.json()["session_id"]
+
+
+def test_add_bonds_finds_every_bond_within_the_range():
+    """A primitive bcc cell of 2.86 A and a range of 7 A: the search was
+    limited to the neighbouring cells, and 55 of its 68 bonds were missed."""
+    sid = upload_fixture("synthetic_bcc.struct", primitive_cell=True)
+    res = add_bonds(sid, rmin=0.0, rmax=7.0)
+    assert res.status_code == 200, res.text
+    model = api.sessions[sid]["model"]
+    pos = np.array(model.site_properties["coord_atomos"], dtype=float)
+    lat = np.array(model.lattice_properties["bravais_vectors"], dtype=float)
+    expected = sum(
+        1
+        for n in itertools.product(range(-6, 7), repeat=3)
+        if 0 < np.linalg.norm(np.array(n) @ lat) < 7.0
+    ) // 2  # one site: (0, 0, n) and (0, 0, -n) are the same bond
+    assert len(pos) == 1
+    assert sum(len(b["bonds"]) for b in model.bonds.values()) == expected == 68
+
+
+def test_add_bonds_ignores_the_supercell_size():
+    sids = [upload_fixture("synthetic_bcc.struct", primitive_cell=True) for _ in range(2)]
+    a = add_bonds(sids[0], rmin=0.0, rmax=5.0).json()["cif_text"]
+    b = add_bonds(sids[1], rmin=0.0, rmax=5.0, supercell_size=[3, 3, 3]).json()["cif_text"]
+    assert a == b
+
+
+def test_a_range_too_long_for_the_cell_is_an_error():
+    """It was a 500; the offset was stored wrapped before."""
+    sid = upload_fixture("synthetic_bcc.struct", primitive_cell=True)
+    res = add_bonds(sid, rmin=0.0, rmax=20.0)
+    assert res.status_code == 422
+    assert "cell offset" in res.json()["detail"]
